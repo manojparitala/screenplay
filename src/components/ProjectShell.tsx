@@ -43,7 +43,7 @@ import { downloadFile, formatRuntime, Menu } from './ui'
 const TABS: { id: ViewId; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { id: 'script', label: 'Script', icon: FileText },
   { id: 'cards', label: 'Cards', icon: LayoutGrid },
-  { id: 'beats', label: 'Beat Sheet', icon: Route },
+  { id: 'beats', label: 'Beats', icon: Route },
   { id: 'characters', label: 'Characters', icon: Users },
   { id: 'locations', label: 'Locations', icon: MapPin },
   { id: 'reports', label: 'Reports', icon: ChartColumn },
@@ -125,9 +125,13 @@ function ExportMenu() {
 
 function SaveIndicator() {
   const state = useApp((s) => s.saveState)
-  const label = state === 'saved' ? 'All changes saved' : state === 'saving' ? 'Saving…' : state === 'unsaved' ? 'Editing…' : 'Save failed'
+  const label = state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving…' : state === 'unsaved' ? 'Edited' : 'Save failed'
   return (
-    <span className={`save-state${state === 'error' ? ' error' : ''}`} aria-live="polite">
+    <span
+      className={`save-state${state === 'error' ? ' error' : ''}`}
+      aria-live="polite"
+      title={state === 'saved' ? 'All changes are saved in this browser' : undefined}
+    >
       {label}
     </span>
   )
@@ -173,6 +177,7 @@ export function ProjectShell() {
   const view = useApp((s) => s.view)
   const dialog = useApp((s) => s.dialog)
   const theme = useApp((s) => s.prefs.theme)
+  const focusMode = useApp((s) => s.focusMode && s.view === 'script')
   const { setView, setDialog, closeProject, setFindOpen, saveNow, setPrefs, notify } = useApp.getState()
 
   useEffect(() => {
@@ -210,7 +215,7 @@ export function ProjectShell() {
 
   return (
     <>
-      <header className="topbar no-print">
+      <header className="topbar no-print" hidden={focusMode}>
         <button className="icon-btn" onClick={() => void closeProject()} aria-label="Back to library" title="Back to library">
           <ArrowLeft size={18} />
         </button>

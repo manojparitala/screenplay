@@ -92,7 +92,7 @@ test('element shortcuts, undo and persistence across reloads', async ({ page }) 
   expect((await elements(page))[1][0]).toBe('note')
   await page.keyboard.press('ControlOrMeta+z')
   expect((await elements(page))[1][0]).toBe('action')
-  await expect(page.locator('.save-state')).toHaveText('All changes saved', { timeout: 5000 })
+  await expect(page.locator('.save-state')).toHaveText('Saved', { timeout: 5000 })
   await page.reload()
   await expect(page.locator('.script-editor')).toBeVisible()
   expect(await elements(page)).toEqual([

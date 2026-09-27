@@ -76,6 +76,40 @@ describe('paginate', () => {
     expect(printed).toBe(speech)
   })
 
+  it('breaks speeches at the end of a sentence even when it falls mid-line', () => {
+    const els: ScriptElement[] = []
+    for (let i = 0; i < 24; i++) els.push(el('action', `Line ${i}.`))
+    const words = ['Go.', 'We have to leave before the tide comes in.', 'Now!', 'I mean it this time, truly.']
+    const speech = Array.from({ length: 12 }, (_, i) => words[i % words.length]).join(' ')
+    els.push(el('character', 'MAREN'), el('dialogue', speech))
+    const p = paginate(els)
+    const first = p.pages[0].lines
+    expect(text(first[first.length - 1])).toBe('(MORE)')
+    expect(text(first[first.length - 2])).toMatch(/[.!]$/)
+    expect(text(p.pages[1].lines[1])).toMatch(/^[A-Z]/)
+    const printed = p.pages
+      .flatMap((pg) => pg.lines)
+      .filter((l) => l?.type === 'dialogue')
+      .map(text)
+      .join(' ')
+    expect(printed).toBe(speech)
+    // The editor marker points at the first character of the continued sentence.
+    expect(speech.slice(p.breaks[0].offset)).toBe(text(p.pages[1].lines[1]) + speech.slice(p.breaks[0].offset + text(p.pages[1].lines[1]).length))
+  })
+
+  it('splits long action at a sentence end', () => {
+    const els: ScriptElement[] = []
+    for (let i = 0; i < 26; i++) els.push(el('action', `Line ${i}.`))
+    const para = Array.from({ length: 10 }, (_, i) => `The wind rises${i % 2 ? ' again and again over the grey water' : ''}.`).join(' ')
+    els.push(el('action', para))
+    const p = paginate(els)
+    expect(p.pages).toHaveLength(2)
+    const first = p.pages[0].lines
+    expect(text(first[first.length - 1])).toMatch(/\.$/)
+    const printed = p.pages.flatMap((pg) => pg.lines).filter((l) => l?.elementIndex === 26).map(text).join(' ')
+    expect(printed).toBe(para)
+  })
+
   it('never exceeds the page length', () => {
     const { elements } = parseFountain(SAMPLE_FOUNTAIN)
     const big = Array.from({ length: 20 }, () => elements).flat()

@@ -14,7 +14,7 @@ test('every view renders the sample script without errors', async ({ page }) => 
   await openSample(page)
   for (const [tab, check] of [
     ['Cards', '.index-card'],
-    ['Beat Sheet', '.beat'],
+    ['Beats', '.beat'],
     ['Characters', '.detail-title'],
     ['Locations', '.detail-title'],
     ['Reports', '.kpi'],
@@ -81,4 +81,50 @@ test('shows page breaks for a long script', async ({ page, context }) => {
   await page.keyboard.press('ControlOrMeta+v')
   await expect(page.locator('.page-break-label').first()).toBeVisible()
   await expect(page.locator('.statusbar')).toContainText(/of [5-9]/)
+})
+
+test('imports a Final Draft file from the library', async ({ page }) => {
+  await page.goto('/')
+  const fdx = `<?xml version="1.0" encoding="UTF-8"?>
+<FinalDraft DocumentType="Script" Version="5"><Content>
+<Paragraph Type="Scene Heading"><Text>INT. SUBMARINE - NIGHT</Text></Paragraph>
+<Paragraph Type="Action"><Text>Sonar pings.</Text></Paragraph>
+<Paragraph Type="Character"><Text>CAPTAIN</Text></Paragraph>
+<Paragraph Type="Dialogue"><Text>Dive.</Text></Paragraph>
+</Content></FinalDraft>`
+  await page.locator('input[type=file]').setInputFiles({ name: 'Deep Water.fdx', mimeType: 'application/xml', buffer: Buffer.from(fdx) })
+  await expect(page.locator('.project-title')).toHaveText('Deep Water')
+  await expect(page.locator('.el-character')).toHaveText('CAPTAIN')
+  await expect(page.locator('.el-dialogue')).toHaveText('Dive.')
+})
+
+test('snapshots save and restore earlier drafts', async ({ page }) => {
+  await openSample(page)
+  await page.getByRole('button', { name: 'Snapshots' }).click()
+  await page.getByLabel('Snapshot name').fill('First draft')
+  await page.getByRole('button', { name: 'Save snapshot' }).click()
+  await expect(page.getByRole('cell', { name: 'First draft' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  // Change the script, then restore.
+  await page.locator('.el-action').first().click()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.press('Backspace')
+  await page.keyboard.type('Gone.')
+  await expect(page.locator('.script-editor > p.el')).toHaveCount(1)
+  await page.getByRole('button', { name: 'Snapshots' }).click()
+  await page.getByRole('row', { name: /First draft/ }).getByRole('button', { name: 'Restore' }).click()
+  await page.getByRole('button', { name: 'Restore', exact: true }).last().click()
+  await expect(page.locator('.nav-scene')).toHaveCount(6)
+})
+
+test('renames a location in every scene heading', async ({ page }) => {
+  await openSample(page)
+  await page.getByRole('button', { name: 'Locations', exact: true }).click()
+  await page.locator('.list-item', { hasText: 'NORTHERN COAST - LIGHTHOUSE' }).click()
+  await page.getByRole('button', { name: 'Rename…' }).click()
+  await page.getByLabel('New name').fill('Cape Wrath Light')
+  await page.getByRole('button', { name: 'Rename in all headings' }).click()
+  await page.getByRole('button', { name: 'Script', exact: true }).click()
+  await expect(page.locator('.nav-scene .heading').first()).toHaveText('EXT. CAPE WRATH LIGHT - DUSK')
+  await expect(page.locator('.nav-scene .heading').nth(2)).toHaveText('EXT. CAPE WRATH LIGHT - NIGHT')
 })

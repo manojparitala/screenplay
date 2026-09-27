@@ -69,8 +69,3 @@ function trimEnd(text: string, start: number, end: number): number {
   return e
 }
 
-/** True if the wrapped line ends a sentence (so a page may break after it). */
-export function endsSentence(text: string, line: LineRange): boolean {
-  const s = text.slice(line.start, line.end).trimEnd()
-  return /[.!?…:;]["'”’)\]]*$/.test(s) || /--$/.test(s)
-}

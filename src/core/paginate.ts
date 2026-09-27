@@ -2,7 +2,7 @@ import { ELEMENTS, PAGE, type ElementInfo } from './elements'
 import { characterName, hasContd } from './scene'
 import { mapRunsText, normalizeRuns, plainText, sliceRuns } from './text'
 import type { ElementType, ScriptElement, TextRun } from './types'
-import { endsSentence, wrapText, type LineRange } from './wrap'
+import { wrapText, type LineRange } from './wrap'
 
 export interface PaginateOptions {
   linesPerPage: number
@@ -118,11 +118,6 @@ function buildBlocks(elements: ScriptElement[], opts: PaginateOptions, contd: nu
   return blocks
 }
 
-interface GroupLine {
-  block: Block
-  line: number
-}
-
 /** Lay the script out on pages exactly as it will print. */
 export function paginate(elements: ScriptElement[], options: Partial<PaginateOptions> = {}): Pagination {
   const opts = { ...DEFAULT_PAGINATE_OPTIONS, ...options }
@@ -212,114 +207,177 @@ export function paginate(elements: ScriptElement[], options: Partial<PaginateOpt
     return next.spaceBefore + Math.min(2, next.lines.length)
   }
 
-  /** Place a block that may break across pages at a sentence (or, failing that, line) boundary. */
+  /** Re-wrap the text range [from, to) of a block on its own (used to split at sentence ends). */
+  const subBlock = (b: Block, from: number, to: number): Block => {
+    let s = from
+    while (s < to && /\s/.test(b.text[s])) s++
+    let e = to
+    while (e > s && /\s/.test(b.text[e - 1])) e--
+    const lines = e > s ? wrapText(b.text.slice(s, e), b.info.width).map((r) => ({ start: r.start + s, end: r.end + s })) : []
+    return { ...b, lines, sceneNumber: s === 0 ? b.sceneNumber : undefined }
+  }
+
+  /** Split after the first `n` wrapped lines. */
+  const lineSplit = (b: Block, n: number): [Block, Block] => [
+    { ...b, lines: b.lines.slice(0, n) },
+    { ...b, lines: b.lines.slice(n), sceneNumber: undefined },
+  ]
+
+  /**
+   * Split a block at the latest sentence end (or forced line break) such that
+   * the first part wraps to at most `maxLines` lines (and at least `minFirst`)
+   * and the rest to at least `minRest` lines.
+   */
+  const sentenceSplit = (b: Block, maxLines: number, minFirst: number, minRest: number): [Block, Block] | null => {
+    if (maxLines < Math.max(1, minFirst) || !b.lines.length) return null
+    const start = b.lines[0].start
+    const end = b.lines[b.lines.length - 1].end
+    const cuts: number[] = []
+    const re = /[.!?…]["'”’)\]]*(?=\s)|--(?=\s)|\n/g
+    re.lastIndex = start
+    let m: RegExpExecArray | null
+    while ((m = re.exec(b.text)) && m.index < end) {
+      const cut = m[0] === '\n' ? m.index : m.index + m[0].length
+      if (cut > start && cut < end) cuts.push(cut)
+    }
+    for (let k = cuts.length - 1; k >= 0; k--) {
+      const first = subBlock(b, start, cuts[k])
+      if (first.lines.length > maxLines) continue
+      if (first.lines.length < minFirst) return null
+      const rest = subBlock(b, cuts[k], end)
+      if (rest.lines.length < Math.max(1, minRest)) continue
+      return [first, rest]
+    }
+    return null
+  }
+
+  /** Place a block that may break across pages, preferably at the end of a sentence. */
   const placeSplittable = (b: Block) => {
-    let from = 0
-    let first = true
-    while (from < b.lines.length) {
-      const left = b.lines.length - from
-      const space = first ? spacing(b) : 0
-      if (space + left <= remaining()) {
+    let blk = b
+    let space = spacing(b)
+    for (let guard = 0; guard < 10000; guard++) {
+      if (space + blk.lines.length <= remaining()) {
         pushBlank(space)
-        placeLines(b, from, b.lines.length)
+        placeLines(blk, 0, blk.lines.length)
         return
       }
       const avail = remaining() - space
       const fresh = cur.lines.length === 0
-      let k = -1
+      let parts: [Block, Block] | null = null
       if (fresh) {
-        k = avail
-        for (let c = avail; c >= Math.max(2, avail - 8); c--) {
-          if (endsSentence(b.text, b.lines[from + c - 1])) {
-            k = c
-            break
-          }
-        }
-      } else if (avail >= 2 && left - avail >= 1) {
-        for (let c = Math.min(avail, left - 2); c >= 2; c--) {
-          if (endsSentence(b.text, b.lines[from + c - 1])) {
-            k = c
-            break
-          }
-        }
-        if (k === -1 && left - avail >= 2 && b.type === 'action') k = avail
+        // A block longer than a page: fill most of the page, ending on a sentence if possible.
+        parts = sentenceSplit(blk, avail, Math.max(1, avail - 12), 1) ?? lineSplit(blk, avail)
+      } else if (avail >= 2) {
+        parts = sentenceSplit(blk, avail, 2, 2)
+        if (!parts && blk.type === 'action' && blk.lines.length - avail >= 2) parts = lineSplit(blk, avail)
       }
-      if (k > 0) {
+      if (parts) {
         pushBlank(space)
-        placeLines(b, from, from + k)
-        from += k
-        newPage()
-      } else {
-        newPage()
+        placeLines(parts[0], 0, parts[0].lines.length)
+        blk = parts[1]
       }
-      first = false
+      newPage()
+      space = 0
     }
+  }
+
+  const synthetic = (type: 'more' | 'contd', text: string, character: Block, elementIndex: number): LayoutLine => ({
+    type,
+    runs: [{ text }],
+    indent: character.info.indent,
+    width: character.info.width,
+    align: 'left',
+    elementIndex,
+    offset: -1,
+  })
+
+  const lineCount = (bs: Block[]) => bs.reduce((n, b) => n + b.lines.length, 0)
+  const dialogueLines = (bs: Block[]) => bs.reduce((n, b) => n + (b.type === 'dialogue' ? b.lines.length : 0), 0)
+
+  interface GroupSplit {
+    before: Block[]
+    after: Block[]
+  }
+
+  /** Where to break a speech that doesn't fit: returns the blocks for this page and the next. */
+  const findDialogueSplit = (queue: Block[], avail: number, fresh: boolean): GroupSplit | null => {
+    let used = 0
+    let k = 0
+    while (k < queue.length && used + queue[k].lines.length <= avail) used += queue[k++].lines.length
+    if (k >= queue.length) return null
+    const blk = queue[k]
+    const head = queue.slice(0, k)
+    const tail = queue.slice(k + 1)
+    const sentence: GroupSplit[] = []
+    const boundary: GroupSplit[] = []
+    const line: GroupSplit[] = []
+    if (blk.type === 'dialogue') {
+      const parts = sentenceSplit(blk, avail - used, 1, 1)
+      if (parts) sentence.push({ before: [...head, parts[0]], after: [parts[1], ...tail] })
+      if (avail - used >= 1) {
+        const [a, b] = lineSplit(blk, avail - used)
+        line.push({ before: [...head, a], after: [b, ...tail] })
+      }
+    }
+    for (let j = k; j >= 1; j--) {
+      if (queue[j - 1].type === 'dialogue') boundary.push({ before: queue.slice(0, j), after: queue.slice(j) })
+    }
+    const valid = (o: GroupSplit) => o.after.length > 0 && o.before[o.before.length - 1].type === 'dialogue' && dialogueLines(o.before) >= 1
+    const comfortable = (o: GroupSplit, remainderMin: number) =>
+      dialogueLines(o.before) >= 2 && (o.after[0].lines[0].start === 0 || o.after[0].lines.length >= remainderMin)
+    const pick =
+      sentence.find((o) => valid(o) && comfortable(o, 1)) ??
+      boundary.find((o) => valid(o) && comfortable(o, 1)) ??
+      line.find((o) => valid(o) && comfortable(o, 2)) ??
+      (fresh ? [...sentence, ...boundary, ...line].find(valid) : undefined)
+    return pick ?? null
   }
 
   const placeDialogueGroup = (group: Block[]) => {
     const character = group[0]
-    let gl: GroupLine[] = []
-    for (const b of group) for (let i = 0; i < b.lines.length; i++) gl.push({ block: b, line: i })
+    const cue = hasContd(character.text) ? character.text : character.text.replace(/\s*$/, '') + CONTD
+    let queue = group
     let space = spacing(character)
-    let guard = 0
-    while (gl.length > 0 && guard++ < 10000) {
-      if (space + gl.length <= remaining()) {
+    for (let guard = 0; queue.length && guard < 10000; guard++) {
+      if (space + lineCount(queue) <= remaining()) {
         pushBlank(space)
-        placeGroupLines(gl)
+        for (const b of queue) placeLines(b, 0, b.lines.length)
         return
       }
-      const avail = remaining() - space - 1 // keep one line for (MORE)
       const fresh = isFresh()
-      const s = findDialogueSplit(gl, avail, fresh)
-      if (s > 0) {
+      const split = findDialogueSplit(queue, remaining() - space - 1, fresh) // one line is kept for (MORE)
+      if (split) {
         pushBlank(space)
-        placeGroupLines(gl.slice(0, s))
-        const splitBlock = gl[s - 1].block
-        pushLine({
-          type: 'more',
-          runs: [{ text: '(MORE)' }],
-          indent: character.info.indent,
-          width: character.info.width,
-          align: 'left',
-          elementIndex: splitBlock.index,
-          offset: -1,
-        })
+        for (const b of split.before) placeLines(b, 0, b.lines.length)
+        pushLine(synthetic('more', '(MORE)', character, split.before[split.before.length - 1].index))
         newPage()
-        const next = gl[s]
+        const next = split.after[0]
         // Record where the page begins in the source, then reprint the cue.
-        breaks.push({ page: cur.number, elementIndex: next.block.index, offset: next.block.lines[next.line].start })
-        const cue = hasContd(character.text) ? character.text : character.text.replace(/\s*$/, '') + CONTD
-        pushLine({
-          type: 'contd',
-          runs: [{ text: cue }],
-          indent: character.info.indent,
-          width: character.info.width,
-          align: 'left',
-          elementIndex: next.block.index,
-          offset: -1,
-        })
-        gl = gl.slice(s)
-        space = 0
-      } else if (!fresh) {
-        newPage()
-        space = 0
-      } else {
+        breaks.push({ page: cur.number, elementIndex: next.index, offset: next.lines[0].start })
+        pushLine(synthetic('contd', cue, character, next.index))
+        queue = split.after
+      } else if (fresh) {
         // Nothing sensible fits even on a fresh page: fill it and carry on.
-        const take = Math.max(1, remaining())
-        placeGroupLines(gl.slice(0, take))
-        gl = gl.slice(take)
-        if (gl.length) newPage()
+        let room = Math.max(1, remaining())
+        const rest: Block[] = []
+        for (const b of queue) {
+          if (room <= 0) rest.push(b)
+          else if (b.lines.length <= room) {
+            placeLines(b, 0, b.lines.length)
+            room -= b.lines.length
+          } else {
+            const [a, r] = lineSplit(b, room)
+            placeLines(a, 0, a.lines.length)
+            rest.push(r)
+            room = 0
+          }
+        }
+        queue = rest
+        if (queue.length) newPage()
+      } else {
+        newPage()
       }
-    }
-  }
-
-  const placeGroupLines = (gl: GroupLine[]) => {
-    for (const { block, line } of gl) {
-      if (line === 0) {
-        if (remaining() <= 0) newPage()
-        markStart(block)
-      }
-      pushLine(lineOf(block, line))
+      space = 0
     }
   }
 
@@ -363,20 +421,6 @@ export function paginate(elements: ScriptElement[], options: Partial<PaginateOpt
   for (const s of scenes) if (!s.page) s.page = elementPage[s.elementIndex]
 
   return { pages, breaks, elementPage, contd, scenes, linesPerPage: L }
-
-  function findDialogueSplit(gl: GroupLine[], avail: number, fresh: boolean): number {
-    const max = Math.min(avail, gl.length - 1)
-    const dialogueBefore = (s: number) => gl.slice(0, s).filter((g) => g.block.type === 'dialogue').length
-    const valid = (s: number) => gl[s - 1].block.type === 'dialogue' && dialogueBefore(s) >= 1
-    const boundary = (s: number) =>
-      gl[s].block !== gl[s - 1].block || endsSentence(gl[s - 1].block.text, gl[s - 1].block.lines[gl[s - 1].line])
-    const comfortable = (s: number) =>
-      dialogueBefore(s) >= 2 && (gl.length - s >= 2 || gl[s].block !== gl[s - 1].block)
-    for (let s = max; s >= 1; s--) if (valid(s) && boundary(s) && comfortable(s)) return s
-    for (let s = max; s >= 1; s--) if (valid(s) && comfortable(s)) return s
-    if (fresh) for (let s = max; s >= 1; s--) if (valid(s)) return s
-    return -1
-  }
 }
 
 /** Scene length in eighths of a page (production convention, minimum 1/8). */

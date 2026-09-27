@@ -236,6 +236,10 @@ kbd {
   min-height: 0;
 }
 
+.topbar[hidden] {
+  display: none;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -269,7 +273,7 @@ kbd {
 
 .project-title {
   font-weight: 650;
-  max-width: 220px;
+  max-width: 190px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -296,7 +300,7 @@ kbd {
   align-items: center;
   gap: 6px;
   height: 32px;
-  padding: 0 10px;
+  padding: 0 9px;
   border-radius: var(--radius-sm);
   border: none;
   background: transparent;
@@ -825,6 +829,21 @@ kbd {
   display: flex;
   flex-direction: column;
   position: relative;
+  container-type: inline-size;
+}
+
+.element-select {
+  display: none;
+}
+
+@container (max-width: 1060px) {
+  .toolbar .element-chips {
+    display: none;
+  }
+
+  .toolbar .element-select {
+    display: block;
+  }
 }
 
 .toolbar {
@@ -1075,10 +1094,15 @@ kbd {
   font-weight: 700;
   text-transform: uppercase;
   font-size: 12.5px;
+  line-height: 1.35;
   color: var(--paper-text);
   padding: 3px 4px;
   border-radius: 4px;
   min-width: 0;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+  min-height: calc(1.35em + 6px);
 }
 
 .index-card-head .heading-input:focus {
@@ -1118,11 +1142,16 @@ kbd {
 .index-card-foot {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px 8px 10px;
+  gap: 4px;
+  padding: 6px 6px 8px 10px;
   font-size: 12px;
   color: var(--text-faint);
-  flex-wrap: wrap;
+  white-space: nowrap;
+}
+
+.index-card-foot .icon-btn.small {
+  width: 24px;
+  height: 24px;
 }
 
 .index-card-foot .grow {
@@ -1850,6 +1879,13 @@ table.data tr.clickable {
 /* ------------------------------------------------------------------ */
 /* Responsive                                                          */
 /* ------------------------------------------------------------------ */
+
+@media (max-width: 1340px) {
+  /* Icons only for inactive tabs; hover shows the name. */
+  .tab:not(.active) .tab-label {
+    display: none;
+  }
+}
 
 @media (max-width: 1100px) {
   .sidebar.right {

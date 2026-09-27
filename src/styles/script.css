@@ -9,6 +9,7 @@
   overflow: auto;
   padding: 28px 24px 40vh;
   scroll-padding: 120px 0;
+  container-type: inline-size;
 }
 
 .paper {
@@ -246,6 +247,44 @@
   background: var(--search-current);
 }
 
+/* Narrow screens: slimmer margins and a page scaled to fit the width. */
+@container (max-width: 760px) {
+  .paper {
+    width: 66ch;
+    min-height: 90ch;
+    padding: 3ch 2ch 8ch 4ch;
+    /* Courier Prime is 0.625em wide, so 66ch = 41.25em. */
+    font-size: calc(min(12pt, 100cqi / 41.25) * var(--zoom, 1));
+  }
+
+  .page-break::before {
+    left: -4ch;
+    right: -2ch;
+  }
+
+  .page-break-label {
+    right: -1.5ch;
+  }
+
+  .el-dialogue .page-break::before {
+    left: -14ch;
+    right: -17ch;
+  }
+
+  .el-dialogue .page-break-label {
+    right: -16.5ch;
+  }
+
+  .page-break-more,
+  .el-dialogue .page-break-more {
+    display: none;
+  }
+
+  .show-scene-numbers .script-editor .el-scene:not(.is-empty)::before {
+    left: -3.5ch;
+  }
+}
+
 /* Autocomplete */
 .ac-menu {
   position: fixed;
@@ -288,7 +327,7 @@
   transition: opacity 0.2s;
 }
 
-.focus-mode .script-editor:focus-within .el:not(.is-current) {
+.focus-mode .script-editor .el:not(.is-current) {
   opacity: 0.35;
 }
 

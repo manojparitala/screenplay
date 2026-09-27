@@ -1,9 +1,9 @@
-import { FileText, GripVertical, Palette, Plus, Trash } from 'lucide-react'
+import { FileText, GripVertical, Palette, Plus, Trash, Users } from 'lucide-react'
 import { useState, type DragEvent } from 'react'
 import type { SceneInfo } from '../core/analysis'
 import { formatEighths, toEighths } from '../core/paginate'
 import { SCENE_COLORS, type SceneColor } from '../core/types'
-import { colorVar, ColorPicker, LazyInput, LazyTextarea, Menu, Modal } from '../components/ui'
+import { colorVar, ColorPicker, LazyTextarea, Menu, Modal } from '../components/ui'
 import { useApp } from '../store/app'
 import { useAnalysis, useController, usePagination } from '../store/hooks'
 
@@ -134,12 +134,19 @@ export function CardsView() {
                       <GripVertical size={16} />
                     </span>
                     <span className="num">{it.scene.number}</span>
-                    <LazyInput
+                    <LazyTextarea
                       className="heading-input"
+                      rows={2}
                       value={it.scene.heading}
                       placeholder="INT. LOCATION - DAY"
                       aria-label={`Scene ${it.scene.number} heading`}
-                      onCommit={(v) => c.setSceneHeading(it.scene.id, v.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          e.currentTarget.blur()
+                        }
+                      }}
+                      onCommit={(v) => c.setSceneHeading(it.scene.id, v.replace(/\s*\n\s*/g, ' ').toUpperCase())}
                     />
                   </div>
                   <LazyTextarea
@@ -153,8 +160,8 @@ export function CardsView() {
                     <span>·</span>
                     <span title="Length in eighths of a page">{lengthOf(it.scene)} pg</span>
                     {it.scene.characters.length > 0 && (
-                      <span className="pill" title={it.scene.characters.join(', ')}>
-                        {it.scene.characters.length} speaking
+                      <span className="pill" title={`Speaking: ${it.scene.characters.join(', ')}`}>
+                        <Users size={12} /> {it.scene.characters.length}
                       </span>
                     )}
                     <span className="grow" />

@@ -53,6 +53,18 @@ function ElementToolbar() {
         <PanelLeft size={16} />
       </button>
       <span className="sep" />
+      <select
+        className="select element-select"
+        value={current ?? ''}
+        aria-label="Element type"
+        onChange={(e) => c.setType(e.target.value as ElementType)}
+      >
+        {ELEMENT_ORDER.map((t) => (
+          <option key={t} value={t}>
+            {ELEMENTS[t].label} (Alt+{ELEMENTS[t].shortcut})
+          </option>
+        ))}
+      </select>
       <div className="element-chips" role="radiogroup" aria-label="Element type">
         {ELEMENT_ORDER.map((t) => (
           <button

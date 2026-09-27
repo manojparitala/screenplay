@@ -74,7 +74,7 @@ export function NotesView() {
                 <LazyTextarea className="body-input" placeholder="Start writing…" value={current.body} onCommit={(body) => edit(current.id, { body })} />
               </div>
             ) : (
-              <div className="panel empty-state" style={{ maxWidth: 'none' }}>
+              <div className="panel empty-state" style={{ maxWidth: 'none', margin: 0 }}>
                 <StickyNote size={32} />
                 <h3>Your notebook is empty</h3>
                 <p>Keep research, alternative lines, feedback from readers or anything else here.</p>
