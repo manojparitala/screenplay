@@ -1,0 +1,381 @@
+/*
+ * Screenplay page. All horizontal measurements are in `ch` of Courier at the
+ * paper's font size, so 1ch = 0.1in at 12pt and the editor wraps lines exactly
+ * like the printed page (see ELEMENTS in src/core/elements.ts).
+ */
+
+.paper-scroller {
+  flex: 1;
+  overflow: auto;
+  padding: 28px 24px 40vh;
+  scroll-padding: 120px 0;
+}
+
+.paper {
+  --lh: 1.25em;
+  font-family: var(--font-script);
+  font-size: calc(12pt * var(--zoom, 1));
+  line-height: var(--lh);
+  color: var(--paper-text);
+  background: var(--paper);
+  box-shadow: var(--paper-shadow);
+  border-radius: 2px;
+  width: 85ch;
+  min-height: 110ch;
+  margin: 0 auto;
+  padding: 6ch 10ch 12ch 15ch;
+  position: relative;
+}
+
+.script-editor {
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  counter-reset: scene;
+  caret-color: var(--accent);
+  min-height: 60ch;
+}
+
+.script-editor .el {
+  position: relative;
+  margin: var(--lh) 0 0;
+  width: 60ch;
+  min-height: var(--lh);
+}
+
+.script-editor > .el:first-child,
+.double-scene-spacing .script-editor > .el-scene:first-child {
+  margin-top: 0;
+}
+
+.script-editor .el-scene {
+  counter-increment: scene;
+  text-transform: uppercase;
+}
+
+.double-scene-spacing .script-editor .el-scene {
+  margin-top: calc(var(--lh) * 2);
+}
+
+.bold-scenes .script-editor .el-scene {
+  font-weight: 700;
+}
+
+.show-scene-numbers .script-editor .el-scene:not(.is-empty)::before {
+  content: counter(scene);
+  position: absolute;
+  left: -6ch;
+  color: var(--text-muted);
+}
+
+.script-editor .el-scene[data-color] {
+  border-left: 0.6ch solid var(--scene-color);
+  margin-left: -1.6ch;
+  padding-left: 1ch;
+}
+
+.el-scene[data-color='red'] { --scene-color: var(--c-red); }
+.el-scene[data-color='orange'] { --scene-color: var(--c-orange); }
+.el-scene[data-color='yellow'] { --scene-color: var(--c-yellow); }
+.el-scene[data-color='green'] { --scene-color: var(--c-green); }
+.el-scene[data-color='teal'] { --scene-color: var(--c-teal); }
+.el-scene[data-color='blue'] { --scene-color: var(--c-blue); }
+.el-scene[data-color='purple'] { --scene-color: var(--c-purple); }
+.el-scene[data-color='pink'] { --scene-color: var(--c-pink); }
+
+.script-editor .el-character {
+  margin-left: 22ch;
+  width: 38ch;
+  text-transform: uppercase;
+}
+
+.script-editor .el-parenthetical {
+  margin-top: 0;
+  margin-left: 16ch;
+  width: 24ch;
+}
+
+.script-editor .el-dialogue {
+  margin-top: 0;
+  margin-left: 10ch;
+  width: 35ch;
+}
+
+.script-editor .el-transition {
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.script-editor .el-shot {
+  text-transform: uppercase;
+}
+
+.script-editor .el-centered {
+  text-align: center;
+}
+
+.script-editor .el-section {
+  font-family: var(--font-ui);
+  font-size: 0.85em;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--section);
+  border-bottom: 1px solid color-mix(in srgb, var(--section) 35%, transparent);
+  padding-bottom: 2px;
+  margin-top: calc(var(--lh) * 1.6);
+}
+
+.script-editor .el-section[data-level='2'] {
+  margin-left: 2ch;
+  width: 58ch;
+  opacity: 0.85;
+}
+
+.script-editor .el-section[data-level='3'] {
+  margin-left: 4ch;
+  width: 56ch;
+  opacity: 0.75;
+}
+
+.script-editor .el-note {
+  font-family: var(--font-ui);
+  font-size: 0.85em;
+  background: var(--note-bg);
+  border-left: 3px solid var(--note-border);
+  padding: 2px 8px;
+  border-radius: 0 4px 4px 0;
+}
+
+.script-editor .el.is-empty::after {
+  content: attr(data-placeholder);
+  position: absolute;
+  inset: 0 auto auto 0;
+  color: var(--text-faint);
+  font-style: italic;
+  text-transform: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.script-editor .el-transition.is-empty::after {
+  inset: 0 0 auto auto;
+}
+
+.script-editor .el-centered.is-empty::after {
+  inset: 0 0 auto 0;
+  text-align: center;
+}
+
+.script-editor .el-scene[data-color].is-empty::after {
+  left: 1ch;
+}
+
+.auto-contd {
+  color: var(--text-muted);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Page breaks drawn from the paginator. */
+.page-break {
+  display: block;
+  position: static;
+  height: 0;
+  margin-top: calc(var(--lh) * 0.5);
+  pointer-events: none;
+  user-select: none;
+  text-transform: none;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.page-break::before {
+  content: '';
+  position: absolute;
+  left: -15ch;
+  right: -10ch;
+  border-top: 1.5px dashed var(--page-rule);
+}
+
+.page-break-label,
+.page-break-more {
+  position: absolute;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  margin-top: -8px;
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--text-faint);
+  border: 1px solid var(--page-rule);
+}
+
+.page-break-label {
+  right: -8ch;
+}
+
+.page-break-more {
+  left: -13ch;
+}
+
+.el-dialogue .page-break::before {
+  left: -25ch;
+  right: -25ch;
+}
+
+.el-dialogue .page-break-label {
+  right: -23ch;
+}
+
+.el-dialogue .page-break-more {
+  left: -23ch;
+}
+
+.page-break-inline {
+  margin: calc(var(--lh) * 0.5) 0;
+}
+
+.search-match {
+  background: var(--search);
+  border-radius: 2px;
+}
+
+.search-current {
+  background: var(--search-current);
+}
+
+/* Autocomplete */
+.ac-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 200px;
+  max-width: 420px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  padding: 4px;
+  font-family: var(--font-script);
+  font-size: 14px;
+}
+
+.ac-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ac-item small {
+  font-family: var(--font-ui);
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.ac-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Focus mode: dim everything except the element being written. */
+.focus-mode .script-editor .el {
+  transition: opacity 0.2s;
+}
+
+.focus-mode .script-editor:focus-within .el:not(.is-current) {
+  opacity: 0.35;
+}
+
+/* ------------------------------------------------------------------ */
+/* Print preview sheets                                                */
+/* ------------------------------------------------------------------ */
+
+.sheets {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 16px 80px;
+}
+
+.sheet {
+  --cw: calc(var(--sheet-scale, 1) * 7.2pt);
+  --lhs: calc(var(--sheet-scale, 1) * 12pt);
+  width: calc(var(--sheet-scale, 1) * 8.5in);
+  height: calc(var(--sheet-scale, 1) * 11in);
+  background: #fff;
+  color: #111;
+  box-shadow: var(--paper-shadow);
+  position: relative;
+  font-family: 'Courier Prime', 'Courier New', Courier, monospace;
+  font-size: calc(var(--sheet-scale, 1) * 12pt);
+  /* Courier Prime advances 0.625em; PDF Courier advances 0.6em (7.2pt at 12pt). */
+  letter-spacing: calc(var(--sheet-scale, 1) * -0.3pt);
+  line-height: var(--lhs);
+  flex: none;
+  overflow: hidden;
+}
+
+.sheet-line {
+  position: absolute;
+  white-space: pre;
+  height: var(--lhs);
+}
+
+.sheet-number {
+  position: absolute;
+  top: calc(var(--sheet-scale, 1) * 0.5in);
+  right: calc(var(--sheet-scale, 1) * 1in);
+}
+
+.sheet .scene-num {
+  position: absolute;
+  color: #111;
+}
+
+.sheet-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  white-space: pre;
+}
+
+@media print {
+  @page {
+    size: letter;
+    margin: 0;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-root,
+  .print-root * {
+    visibility: visible;
+  }
+
+  .sheets {
+    padding: 0;
+    gap: 0;
+    display: block;
+  }
+
+  .sheet {
+    --sheet-scale: 1 !important;
+    box-shadow: none;
+    break-after: page;
+    margin: 0;
+  }
+}
