@@ -86,6 +86,19 @@ interface AppState {
   dismissToast(id: string): void
 }
 
+const SEEDED_KEY = 'screenplay:seeded'
+
+/** The very first time the app runs, put the sample script in the library so there is something to explore. */
+async function seedSampleOnFirstRun(existing: number) {
+  try {
+    if (existing > 0 || localStorage.getItem(SEEDED_KEY)) return
+    localStorage.setItem(SEEDED_KEY, '1')
+  } catch {
+    return
+  }
+  await db.putProject(sampleProject(createProject()))
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let unsubscribeDoc: (() => void) | null = null
 
@@ -121,6 +134,8 @@ export const useApp = create<AppState>((set, get) => {
     async init() {
       db.requestPersistence()
       await get().refreshLibrary()
+      await seedSampleOnFirstRun(get().projects.length)
+      if (get().projects.length === 0) await get().refreshLibrary()
       set({ ready: true })
       if (db.storageMode === 'memory') {
         get().notify('Browser storage is unavailable, so your work will not be kept after you close this tab. Export it before leaving.', 'error')

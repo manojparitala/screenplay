@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Library } from './components/Library'
 import { ProjectShell } from './components/ProjectShell'
 import { Toasts } from './components/ui'
@@ -17,9 +17,16 @@ export function App() {
     })
   }, [])
 
+  // Only touch data-theme once the writer picks a theme, so a host page's own setting is left alone.
+  const themed = useRef(false)
   useEffect(() => {
-    if (theme === 'system') delete document.documentElement.dataset.theme
-    else document.documentElement.dataset.theme = theme
+    if (theme !== 'system') {
+      document.documentElement.dataset.theme = theme
+      themed.current = true
+    } else if (themed.current) {
+      delete document.documentElement.dataset.theme
+      themed.current = false
+    }
   }, [theme])
 
   useEffect(() => {
