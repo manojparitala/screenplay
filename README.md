@@ -36,6 +36,13 @@ Your scripts stay on your machine, saved in the browser's own storage (IndexedDB
 - **Locations** are collected from scene headings, with INT/EXT, times of day, scene list, page count, and description and production notes. Renaming a location updates every heading.
 - **Notes**: a notebook for research and feedback, plus a list of every note left inside the script.
 
+### Character timeline
+- **Journeys**: each character is a line moving between locations in script order. You can see where they go, when their paths cross, and when they are off-screen. Follow up to 8 characters at once; hover a point to see who is there and how much they say, and click to open the scene.
+- **Scene presence**: a character-by-scene grid showing who is in every scene, shaded by how much they speak. Characters who are only named in the action are marked separately.
+- **Shared scenes**: how many scenes each pair of characters appear in together.
+- Each character's profile shows their own journey: a strip across the whole script and the ordered path of places they visit.
+- Options to group sub-locations (HOUSE - KITCHEN → HOUSE) and to count characters who are named in the action but don't speak.
+
 ### Reports
 - Page count, estimated runtime, scenes, words, speaking characters, locations and dialogue share.
 - Charts of dialogue by character, interior/exterior split, time of day and scene lengths in script order.
@@ -89,6 +96,7 @@ src/
     fdx.ts         Final Draft XML reader and writer
     pdf.ts         PDF drawing via jsPDF (and the print preview uses the same drawing code)
     analysis.ts    scenes, characters, locations, word counts, renaming
+    tracking.ts    who is in which scene and where: journeys, presence, shared scenes
     beats.ts       beat sheet templates
   editor/      ProseMirror editor
     schema.ts      one node type per screenplay element
@@ -96,7 +104,7 @@ src/
     autocomplete.ts, plugins.ts   suggestions, page-break markers, find & replace, typewriter scrolling
     controller.ts  owns the editor state so every view edits the script through undoable transactions
   store/       zustand app state and IndexedDB persistence
-  views/       Script, Cards, Beats, Characters, Locations, Reports, Title Page, Notes, Preview
+  views/       Script, Cards, Beats, Characters, Timeline, Locations, Reports, Title Page, Notes, Preview
   components/  app shell, library, dialogs, shared UI
 e2e/           Playwright end-to-end tests
 ```

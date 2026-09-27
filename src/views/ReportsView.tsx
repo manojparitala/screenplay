@@ -1,31 +1,11 @@
 import { Download } from 'lucide-react'
-import { useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { formatEighths, toEighths } from '../core/paginate'
 import { projectTitle, safeFileName } from '../core/project'
 import { downloadFile, formatRuntime } from '../components/ui'
+import { useTooltip } from '../components/viz'
 import { useApp } from '../store/app'
 import { useAnalysis, useController, usePagination, useProject } from '../store/hooks'
-
-interface Tip {
-  x: number
-  y: number
-  content: ReactNode
-}
-
-/** A single hover tooltip shared by every chart on the page. */
-function useTooltip() {
-  const [tip, setTip] = useState<Tip | null>(null)
-  const bind = (content: ReactNode) => ({
-    onMouseMove: (e: MouseEvent) => setTip({ x: e.clientX, y: e.clientY, content }),
-    onMouseLeave: () => setTip(null),
-  })
-  const node = tip ? (
-    <div className="viz-tooltip" style={{ left: Math.min(tip.x + 14, window.innerWidth - 260), top: tip.y + 14 }} role="tooltip">
-      {tip.content}
-    </div>
-  ) : null
-  return { bind, node }
-}
 
 interface Part {
   label: string

@@ -30,7 +30,7 @@ const FEATURES = [
   { icon: Sparkles, title: 'Smart typing', text: 'Autocompletes character names, locations and times of day. Adds (MORE) and (CONT’D) automatically, and shows page breaks as you write.' },
   { icon: LayoutGrid, title: 'Index cards & outline', text: 'Plan on a corkboard. Drag cards to reorder scenes in the script, colour-code storylines and write a synopsis for each scene.' },
   { icon: Route, title: 'Beat sheets', text: 'Save the Cat!, Three-Act, Hero’s Journey and Story Circle templates. Each beat shows the page it should land on.' },
-  { icon: Users, title: 'Characters & locations', text: 'Character bios, wants, needs and arcs. Rename a character or location across the whole script in one step.' },
+  { icon: Users, title: 'Characters & locations', text: 'Character bios, wants, needs and arcs. Chart each character’s journey through scenes and places, and rename anyone everywhere in one step.' },
   { icon: ChartColumn, title: 'Reports', text: 'Page count, runtime, scene lengths in eighths, dialogue share per character, INT/EXT and day/night breakdowns.' },
   { icon: FileDown, title: 'Import & export', text: 'Fountain, Final Draft (.fdx) and PDF with a title page. Snapshots keep earlier drafts safe.' },
   { icon: BookOpen, title: 'Private & offline', text: 'Your scripts are saved in this browser, on this device. Nothing is uploaded to a server.' },

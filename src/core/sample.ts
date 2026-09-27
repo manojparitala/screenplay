@@ -94,11 +94,30 @@ She strikes a match. The old paraffin mantle catches. She pulls the clockwork le
 
 The beam sweeps out across the water.
 
+The radio on the wall crackles.
+
+IDA (V.O.)
+(over the radio)
+Northern Light, this is Harbor. We see you. The Kittiwake sees you.
+
+Maren grabs the handset.
+
+MAREN
+Tell them to keep left of the rocks, Ida.
+
 # ACT TWO
 
 EXT. HARBOR - DAWN
 
 The fishing boat, battered but whole, noses into the harbor. A YOUNG FISHERMAN on deck raises a hand toward the distant tower.
+
+IDA WREN (50s), the harbor master, waits on the quay with a thermos.
+
+IDA
+You were lucky.
+
+YOUNG FISHERMAN
+Wasn't luck. Somebody lit the lamp.
 
 INT. LIGHTHOUSE - KEEPER'S ROOM - MORNING
 

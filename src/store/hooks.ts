@@ -1,6 +1,7 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import type { ScriptAnalysis } from '../core/analysis'
 import type { Pagination } from '../core/paginate'
+import { buildTracking, type Tracking } from '../core/tracking'
 import type { Project, ScriptElement } from '../core/types'
 import type { ScriptController } from '../editor/controller'
 import { useApp } from './app'
@@ -47,4 +48,13 @@ export function useAnalysis(): ScriptAnalysis {
 export function usePagination(): Pagination {
   const c = useController()
   return useSyncExternalStore(c.subscribe, c.getPagination)
+}
+
+/** Who is in which scene and where, following the writer's tracking preferences. */
+export function useTracking(): Tracking {
+  const elements = useElements()
+  const analysis = useAnalysis()
+  const includeMentions = useApp((s) => s.prefs.trackMentions)
+  const groupLocations = useApp((s) => s.prefs.groupPlaces)
+  return useMemo(() => buildTracking(elements, analysis, { includeMentions, groupLocations }), [elements, analysis, includeMentions, groupLocations])
 }

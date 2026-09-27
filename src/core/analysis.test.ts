@@ -17,7 +17,8 @@ describe('analyze', () => {
   })
 
   it('counts characters by speeches', () => {
-    expect(a.characters.map((c) => c.name)).toEqual(['MAREN', 'TEO'])
+    expect(a.characters.map((c) => c.name)).toEqual(['MAREN', 'TEO', 'IDA', 'YOUNG FISHERMAN'])
+    expect(a.characters[2].extensions).toEqual(['V.O.'])
     expect(a.characters[0].speeches).toBeGreaterThan(5)
     expect(a.characters[0].firstScene).toBe(1)
   })

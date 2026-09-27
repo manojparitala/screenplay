@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   ChartColumn,
+  ChartGantt,
   CircleQuestionMark,
   Clock,
   Download,
@@ -34,6 +35,7 @@ import { NotesView } from '../views/NotesView'
 import { PreviewView } from '../views/PreviewView'
 import { ReportsView } from '../views/ReportsView'
 import { ScriptView } from '../views/ScriptView'
+import { TimelineView } from '../views/TimelineView'
 import { TitlePageView } from '../views/TitlePageView'
 import { HelpDialog } from './HelpDialog'
 import { SettingsDialog } from './SettingsDialog'
@@ -45,6 +47,7 @@ const TABS: { id: ViewId; label: string; icon: ComponentType<{ size?: number }> 
   { id: 'cards', label: 'Cards', icon: LayoutGrid },
   { id: 'beats', label: 'Beats', icon: Route },
   { id: 'characters', label: 'Characters', icon: Users },
+  { id: 'timeline', label: 'Timeline', icon: ChartGantt },
   { id: 'locations', label: 'Locations', icon: MapPin },
   { id: 'reports', label: 'Reports', icon: ChartColumn },
   { id: 'title', label: 'Title Page', icon: Type },
@@ -269,6 +272,7 @@ export function ProjectShell() {
         {view === 'cards' && <CardsView />}
         {view === 'beats' && <BeatsView />}
         {view === 'characters' && <CharactersView />}
+        {view === 'timeline' && <TimelineView />}
         {view === 'locations' && <LocationsView />}
         {view === 'reports' && <ReportsView />}
         {view === 'title' && <TitlePageView />}

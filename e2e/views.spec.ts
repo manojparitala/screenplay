@@ -16,6 +16,7 @@ test('every view renders the sample script without errors', async ({ page }) => 
     ['Cards', '.index-card'],
     ['Beats', '.beat'],
     ['Characters', '.detail-title'],
+    ['Timeline', '.journeys'],
     ['Locations', '.detail-title'],
     ['Reports', '.kpi'],
     ['Title Page', '.sheet'],
@@ -127,4 +128,31 @@ test('renames a location in every scene heading', async ({ page }) => {
   await page.getByRole('button', { name: 'Script', exact: true }).click()
   await expect(page.locator('.nav-scene .heading').first()).toHaveText('EXT. CAPE WRATH LIGHT - DUSK')
   await expect(page.locator('.nav-scene .heading').nth(2)).toHaveText('EXT. CAPE WRATH LIGHT - NIGHT')
+})
+
+test('character timeline charts journeys and presence, and opens scenes', async ({ page }) => {
+  await openSample(page)
+  await page.getByRole('button', { name: 'Timeline', exact: true }).click()
+  // Every speaking character is followed by default, each with a line.
+  await expect(page.locator('.char-chip.on')).toHaveCount(4)
+  await expect(page.locator('.journey-scroll .series-label')).toHaveText(['MAREN', 'TEO', 'IDA', 'YOUNG FISHERMAN'])
+  // Unfollowing a character removes their line but keeps the others' colours.
+  const tealBefore = await page.locator('.char-chip', { hasText: 'IDA' }).locator('.tip-key').evaluate((el) => getComputedStyle(el).backgroundColor)
+  await page.locator('.char-chip', { hasText: 'TEO' }).click()
+  await expect(page.locator('.journey-scroll .series-label')).toHaveCount(3)
+  const tealAfter = await page.locator('.char-chip', { hasText: 'IDA' }).locator('.tip-key').evaluate((el) => getComputedStyle(el).backgroundColor)
+  expect(tealAfter).toBe(tealBefore)
+  // Presence grid: Ida speaks in scenes 4 and 5 only.
+  const idaRow = page.locator('.presence-row', { has: page.locator('.presence-label', { hasText: /^IDA$/ }) })
+  await expect(idaRow.locator('button.presence-cell')).toHaveCount(2)
+  await idaRow.locator('button.presence-cell').last().click()
+  await expect(page.locator('.script-editor')).toBeVisible()
+  await expect(page.locator('.statusbar')).toContainText('Scene 5 of 6')
+})
+
+test('shows a character’s journey on their profile', async ({ page }) => {
+  await openSample(page)
+  await page.getByRole('button', { name: 'Characters', exact: true }).click()
+  await page.locator('.list-item', { hasText: 'IDA' }).click()
+  await expect(page.locator('.path-place')).toHaveText(['LIGHTHOUSE - LAMP ROOM', 'HARBOR'])
 })

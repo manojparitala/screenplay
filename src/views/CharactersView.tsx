@@ -4,6 +4,7 @@ import { scenesMentioning, type SceneInfo } from '../core/analysis'
 import { emptyCharacterProfile, type CharacterProfile } from '../core/types'
 import { avatarColor, initials, LazyInput, LazyTextarea, Modal } from '../components/ui'
 import { useApp } from '../store/app'
+import { CharacterJourney } from './TimelineView'
 import { useAnalysis, useController, useElements, usePagination, useProject } from '../store/hooks'
 
 const FIELDS: { key: keyof CharacterProfile; label: string; placeholder: string; long?: boolean }[] = [
@@ -171,6 +172,11 @@ export function CharactersView() {
                 <b>{current.firstScene || '–'}</b>
                 <span>first speaks in scene</span>
               </div>
+            </div>
+
+            <div className="panel" style={{ padding: 16 }}>
+              <h2 className="section-title">Journey</h2>
+              <CharacterJourney name={current.name} />
             </div>
 
             <div className="panel" style={{ padding: 16 }}>

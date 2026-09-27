@@ -6,7 +6,7 @@ import type { Project, ScriptSettings, Snapshot } from '../core/types'
 import { ScriptController } from '../editor/controller'
 import * as db from './db'
 
-export type ViewId = 'script' | 'cards' | 'beats' | 'characters' | 'locations' | 'reports' | 'title' | 'notes' | 'preview'
+export type ViewId = 'script' | 'cards' | 'beats' | 'characters' | 'timeline' | 'locations' | 'reports' | 'title' | 'notes' | 'preview'
 export type DialogId = 'settings' | 'snapshots' | 'help' | null
 export type Theme = 'system' | 'light' | 'dark'
 export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error'
@@ -17,10 +17,22 @@ export interface Prefs {
   typewriter: boolean
   showNavigator: boolean
   showInspector: boolean
+  /** Character tracking: count characters who are only named in action. */
+  trackMentions: boolean
+  /** Character tracking: merge "HOUSE - KITCHEN" into "HOUSE". */
+  groupPlaces: boolean
 }
 
 const PREFS_KEY = 'screenplay:prefs'
-const DEFAULT_PREFS: Prefs = { theme: 'system', zoom: 1, typewriter: false, showNavigator: true, showInspector: true }
+const DEFAULT_PREFS: Prefs = {
+  theme: 'system',
+  zoom: 1,
+  typewriter: false,
+  showNavigator: true,
+  showInspector: true,
+  trackMentions: true,
+  groupPlaces: false,
+}
 
 function loadPrefs(): Prefs {
   try {
