@@ -85,7 +85,13 @@ export async function exportAs(kind: 'pdf' | 'fountain' | 'fdx' | 'json') {
       const saved = await saveFile(`${base}.pdf`, blob, 'application/pdf')
       if (saved && fontError) {
         const names = [...scripts].map((k) => SCRIPTS[k].label).join(', ')
-        s.notify(`The fonts for ${names} couldn’t be loaded, so that text appears as “?” in this PDF. Check your connection and export again.`, 'error')
+        s.notify(
+          `The ${names} text couldn’t be prepared for this PDF, so it appears as “?”. ` +
+            (canPrint()
+              ? 'Try again, or open Preview, choose Print and save as PDF.'
+              : 'Try again, or export Fountain or Final Draft, which keep every character.'),
+          'error',
+        )
       } else if (saved && missing.length) {
         const sample = missing.slice(0, 6).join(' ')
         s.notify(
