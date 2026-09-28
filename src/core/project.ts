@@ -1,5 +1,6 @@
 import { parseFdx } from './fdx'
 import { parseFountain } from './fountain'
+import { looksIndented, parseIndentedText, type LayoutImport } from './pdfimport'
 import { uid } from './id'
 import { plainText } from './text'
 import {
@@ -100,12 +101,13 @@ export function sanitizeProject(raw: unknown, keepId = true): Project {
   }
 }
 
-export type ImportFormat = 'fountain' | 'fdx' | 'json'
+export type ImportFormat = 'fountain' | 'fdx' | 'json' | 'indented'
 
 export function detectFormat(fileName: string, text: string): ImportFormat {
   const lower = fileName.toLowerCase()
   if (lower.endsWith('.fdx') || /^\s*<\?xml[\s\S]{0,200}<FinalDraft/.test(text) || /^\s*<FinalDraft/.test(text)) return 'fdx'
   if (lower.endsWith('.json') || /^\s*\{/.test(text)) return 'json'
+  if (!lower.endsWith('.fountain') && !lower.endsWith('.spmd') && looksIndented(text)) return 'indented'
   return 'fountain'
 }
 
@@ -125,7 +127,12 @@ export function projectFromFile(fileName: string, text: string): Project {
     p.updatedAt = Date.now()
     return p
   }
-  const parsed = format === 'fdx' ? parseFdx(text) : parseFountain(text)
+  const parsed = format === 'fdx' ? parseFdx(text) : format === 'indented' ? parseIndentedText(text) : parseFountain(text)
+  return projectFromParsed(fileName, parsed)
+}
+
+/** Build a project from elements recovered from a laid-out script (PDF or indented text). */
+export function projectFromParsed(fileName: string, parsed: LayoutImport): Project {
   const p = createProject('')
   const fallbackTitle = fileName.replace(/\.[^.]+$/, '')
   p.titlePage = { ...p.titlePage, ...parsed.titlePage }

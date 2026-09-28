@@ -2159,7 +2159,13 @@ table.data tr.clickable {
   text-transform: uppercase;
   color: var(--text);
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.lane-label span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .journey-scroll {

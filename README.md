@@ -56,7 +56,8 @@ Your scripts stay on your machine, saved in the browser's own storage (IndexedDB
 
 ### Output & safety
 - **Export**: PDF with an optional title page, Fountain (`.fountain`), Final Draft (`.fdx`) and a full project backup (`.json`).
-- **Import**: Fountain, Final Draft and project backups. You can also drop a file onto the library.
+- **Import**: PDF, Fountain, Final Draft, indented plain-text scripts and project backups. You can also drop a file onto the library.
+  - PDF import rebuilds the script from the page layout: indentation, capitals and bold tell scene headings, action, character cues, parentheticals and dialogue apart. Page numbers, headers and footers, (MORE)/(CONT'D), scene numbers and revision marks are removed, and speeches split across pages are rejoined. It works with scripts exported from screenwriting software and with web pages saved as PDF (for example from IMSDb). Scanned PDFs need text recognition (OCR) first.
 - **Print preview** drawn from exactly the same layout as the PDF, and **Print** straight from the browser.
 - **Title page** editor with a live preview.
 - **Snapshots**: save named copies of the script (for example "First draft" or "Before Act 2 rewrite"). You can restore one later; the current version is snapshotted first, so nothing is lost.
@@ -100,6 +101,7 @@ src/
     paginate.ts    page layout: widths, spacing, keep-together rules, (MORE)/(CONT'D)
     fountain.ts    Fountain parser and writer (title page, emphasis, forced elements, notes, sections)
     fdx.ts         Final Draft XML reader and writer
+    pdfimport.ts   rebuilds screenplay elements from a laid-out PDF or indented text
     pdf.ts         PDF drawing via jsPDF (and the print preview uses the same drawing code)
     analysis.ts    scenes, characters, locations, word counts, renaming
     tracking.ts    who is in which scene and where, and who talks with whom

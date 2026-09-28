@@ -119,7 +119,7 @@ function Journeys(props: {
       <div className="journey-lanes" style={{ paddingTop: top, paddingBottom: bottom }} aria-hidden="true">
         {lanes.map((p) => (
           <div key={p} className="lane-label" style={{ height: laneH }} title={p}>
-            {p}
+            <span>{p}</span>
           </div>
         ))}
       </div>

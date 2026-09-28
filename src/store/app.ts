@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { uid } from '../core/id'
-import { createProject, projectFromFile, projectTitle } from '../core/project'
+import { createProject, projectFromFile, projectFromParsed, projectTitle } from '../core/project'
 import { sampleProject } from '../core/sample'
 import type { Project, ScriptSettings, Snapshot } from '../core/types'
 import { ScriptController } from '../editor/controller'
@@ -94,7 +94,7 @@ interface AppState {
   createSnapshot(name: string): Promise<void>
   restoreSnapshot(snap: Snapshot): Promise<void>
 
-  notify(message: string, kind?: Toast['kind']): void
+  notify(message: string, kind?: Toast['kind']): string
   dismissToast(id: string): void
 }
 
@@ -171,8 +171,18 @@ export const useApp = create<AppState>((set, get) => {
 
     async importFile(file) {
       try {
-        const text = await file.text()
-        const p = projectFromFile(file.name, text)
+        let p: Project
+        if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+          const reading = get().notify(`Reading “${file.name}”…`)
+          try {
+            const { importPdf } = await import('./pdf')
+            p = projectFromParsed(file.name, await importPdf(await file.arrayBuffer()))
+          } finally {
+            get().dismissToast(reading)
+          }
+        } else {
+          p = projectFromFile(file.name, await file.text())
+        }
         await db.putProject(p)
         await get().openProject(p.id)
         get().notify(`Imported “${projectTitle(p)}”.`)
@@ -329,6 +339,7 @@ export const useApp = create<AppState>((set, get) => {
       const id = uid()
       set({ toasts: [...get().toasts, { id, message, kind }] })
       setTimeout(() => get().dismissToast(id), kind === 'error' ? 9000 : 4000)
+      return id
     },
     dismissToast(id) {
       set({ toasts: get().toasts.filter((t) => t.id !== id) })

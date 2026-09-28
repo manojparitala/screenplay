@@ -23,7 +23,7 @@ import type { Project } from '../core/types'
 import { useApp } from '../store/app'
 import { downloadFile, Menu, Modal, timeAgo } from './ui'
 
-const ACCEPT = '.fountain,.spmd,.txt,.fdx,.json,.md'
+const ACCEPT = '.fountain,.spmd,.txt,.fdx,.pdf,.json,.md'
 
 const FEATURES = [
   { icon: Clapperboard, title: 'Industry-standard formatting', text: 'Scene headings, action, character, parenthetical, dialogue and transitions laid out in Courier on real page margins. Enter and Tab move between elements for you.' },
@@ -83,7 +83,7 @@ export function Library() {
           <div className="library-hero">
             <div>
               <h1>Your screenplays</h1>
-              <p>Write, outline and format scripts to industry standard. Drop a Fountain, Final Draft or backup file here to import it.</p>
+              <p>Write, outline and format scripts to industry standard. Drop a PDF, Fountain, Final Draft or backup file here to import it.</p>
             </div>
             <div className="library-actions">
               <button className="btn" onClick={() => fileRef.current?.click()}>
