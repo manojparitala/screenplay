@@ -38,6 +38,18 @@ describe('PDF import', () => {
     expect(simplify(result.elements)).toEqual(simplify(printable).map(([type, text]) => [type === 'centered' ? 'centered' : type, text]))
   }, 30000)
 
+  it('uses printed scene numbers to find headings that lack INT./EXT.', async () => {
+    const { elements } = parseFountain(
+      Array.from({ length: 30 }, (_, i) => `.MONTAGE ${i + 1} - THE CITY WAKES\n\nTRAFFIC SURGES ACROSS THE BRIDGE.\n\nPeople hurry past.\n`).join('\n'),
+    )
+    const blob = await exportPdf(elements, { settings: { ...DEFAULT_SETTINGS, showSceneNumbers: true, includeTitlePage: false } })
+    const pages = await readPdfPages(new Uint8Array(await blob.arrayBuffer()), pdfjs as unknown as PdfJsLike)
+    const back = parsePdfPages(pages).elements
+    expect(back.filter((e) => e.type === 'scene').map(plainText)).toEqual(elements.filter((e) => e.type === 'scene').map(plainText))
+    // Capitalised action lines are still action.
+    expect(back.filter((e) => e.type === 'action' && plainText(e).startsWith('TRAFFIC'))).toHaveLength(30)
+  }, 30000)
+
   it('reads a web-page printout with a sidebar, headers and bold cues', () => {
     const item = (str: string, x: number, y: number, font = 'Menlo-Regular'): PdfItem => ({ str, x, y, width: str.length * 4.8, height: 8, font })
     const page = (n: number, body: PdfItem[]): PdfPage => ({

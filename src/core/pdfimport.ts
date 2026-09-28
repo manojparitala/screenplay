@@ -37,6 +37,8 @@ export interface LayoutTextLine {
   page: number
   y: number
   x: number
+  /** Font size (PDF points, or 1 for plain text). */
+  size: number
   text: string
   bold: boolean
   family: string
@@ -129,19 +131,20 @@ export function linesFromPdfPages(pages: PdfPage[]): { lines: LayoutTextLine[]; 
       const kept = segments.filter((s) => s.text)
       if (!kept.length) continue
       const family = [...families.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
-      lines.push(makeLine(pageIndex, row[0].y, kept, chars > 0 && boldChars / chars >= 0.5, family))
+      const size = Math.max(...row.map((it) => it.height || 0)) || charWidth / 0.6
+      lines.push(makeLine(pageIndex, row[0].y, kept, chars > 0 && boldChars / chars >= 0.5, family, size))
     }
   })
   return { lines, charWidth }
 }
 
-function makeLine(page: number, y: number, segments: Segment[], bold: boolean, family: string): LayoutTextLine {
+function makeLine(page: number, y: number, segments: Segment[], bold: boolean, family: string, size = 1): LayoutTextLine {
   let text = segments.map((s) => s.text).join(' ')
   const hyphen = SOFT_HYPHEN.test(text)
   if (hyphen) text = text.replace(SOFT_HYPHEN, '')
   // Hyphenation marks some readers leave inside words.
   text = text.replace(/[­￾]/g, '')
-  return { page, y, x: segments[0].x, text, bold, family, segments, hyphen }
+  return { page, y, x: segments[0].x, size, text, bold, family, segments, hyphen }
 }
 
 /* ------------------------------------------------------------------ */
@@ -196,6 +199,8 @@ interface BodyLine {
   pageBreak: boolean
   hyphen: boolean
   page: number
+  /** A scene number was printed beside this line. */
+  numbered: boolean
 }
 
 const SCENE_NUMBER = /^[A-Z]{0,2}\d{1,4}[A-Z]{0,3}\.?$/
@@ -245,10 +250,15 @@ function isTransition(t: string, col: number): boolean {
 }
 
 /** Page geometry shared by every line: where action starts and how tall a line is. */
+/** Where a line's text starts, ignoring a scene number printed in the left margin. */
+function bodyX(l: LayoutTextLine): number {
+  return l.segments.length > 1 && SCENE_NUMBER.test(l.segments[0].text) ? l.segments[1].x : l.x
+}
+
 function geometry(lines: LayoutTextLine[], charWidth: number) {
   const cols = new Map<number, number>()
   for (const l of lines) {
-    const c = Math.round(l.x / charWidth)
+    const c = Math.round(bodyX(l) / charWidth)
     cols.set(c, (cols.get(c) ?? 0) + 1)
   }
   const threshold = lines.length * 0.08
@@ -261,8 +271,12 @@ function geometry(lines: LayoutTextLine[], charWidth: number) {
       if (d > 0.01) diffs.push(d)
     }
   }
-  const smallest = diffs.length ? Math.min(...diffs) : 1
-  const lineHeight = median(diffs.filter((d) => d < smallest * 1.6)) || smallest
+  // Screenplays are single-spaced, so a line is about one font size tall. Measured
+  // spacing is used when available; the font size keeps a script whose paragraphs
+  // are all one line long (every gap a blank line) from being misread.
+  const fontSize = median(lines.map((l) => l.size)) || 1
+  const single = diffs.filter((d) => d <= fontSize * 1.5)
+  const lineHeight = median(single) || fontSize
   return { leftX: leftCol * charWidth, lineHeight }
 }
 
@@ -286,8 +300,11 @@ function stripFurniture(lines: LayoutTextLine[], pageHeights: number[] | null): 
     if (JUNK.some((re) => re.test(l.text.trim()))) return false
     const repeated = (seen.get(norm(l.text))?.size ?? 0) >= Math.max(3, pages * 0.25)
     if (!repeated) return true
-    // A character who speaks at the top of many pages is not a running header.
+    // A character who speaks at the top of many pages is not a running header,
+    // and neither is a scene heading (numbered in the margin, or INT./EXT.).
     if (isCueText(l.text) && !/\d/.test(l.text)) return true
+    if (l.segments.length > 1 && SCENE_NUMBER.test(l.segments[0].text)) return true
+    if (looksLikeSceneHeading(l.text) || /^(INT|EXT)\b/.test(l.text)) return true
     // Only lines at the very top or bottom of a page count as headers and footers,
     // so a character who speaks on every page is never mistaken for one.
     const h = pageHeights?.[l.page]
@@ -372,9 +389,17 @@ export function classifyLayout(raw: LayoutTextLine[], charWidth: number, pageHei
   let prev: LayoutTextLine | null = null
   for (const l of splitColumns(lines, leftX, charWidth)) {
     let segs = l.segments
-    // Scene numbers and revision marks printed in the margins.
-    if (segs.length > 1 && segs[0].x < leftX - charWidth && SCENE_NUMBER.test(segs[0].text)) segs = segs.slice(1)
-    if (segs.length > 1 && MARGIN_MARK.test(segs[segs.length - 1].text) && segs[segs.length - 1].x > segs[0].x + charWidth * 30) segs = segs.slice(0, -1)
+    // Scene numbers and revision marks printed in the margins. A scene number
+    // beside a line marks it as a scene heading.
+    let numbered = false
+    if (segs.length > 1 && segs[0].x < leftX - charWidth && SCENE_NUMBER.test(segs[0].text)) {
+      segs = segs.slice(1)
+      numbered = true
+    }
+    if (segs.length > 1 && MARGIN_MARK.test(segs[segs.length - 1].text) && segs[segs.length - 1].x > segs[0].x + charWidth * 30) {
+      if (SCENE_NUMBER.test(segs[segs.length - 1].text)) numbered = true
+      segs = segs.slice(0, -1)
+    }
     const x = segs[0].x
     const col = Math.round((x - leftX) / charWidth)
     const text = l.segments === segs ? l.text : segs.map((s) => s.text).join(' ')
@@ -384,17 +409,19 @@ export function classifyLayout(raw: LayoutTextLine[], charWidth: number, pageHei
     if (col > 55 && MARGIN_MARK.test(text.trim())) continue
     const pageBreak = !!prev && prev.page !== l.page
     const gap = prev && !pageBreak ? (prev.y - l.y) / lineHeight : pageBreak ? 1 : 99
-    body.push({ text: text.trim(), col, row: l.y / lineHeight, bold: l.bold, gap, pageBreak, hyphen: l.hyphen, page: l.page })
+    body.push({ text: text.trim(), col, row: l.y / lineHeight, bold: l.bold, gap, pageBreak, hyphen: l.hyphen, page: l.page, numbered })
     prev = l
   }
 
   // Title page: either a whole first page without scenes, or the centered block before the first scene.
   let titlePage: Partial<TitlePage> = {}
-  const isHeadingStart = (b: BodyLine) => b.col <= 3 && (looksLikeSceneHeading(b.text) || /^(INT|EXT)\b/.test(b.text) || SCENE_NUMBER.test(b.text))
+  const isHeadingStart = (b: BodyLine) => b.col <= 3 && (b.numbered || looksLikeSceneHeading(b.text) || /^(INT|EXT)\b/.test(b.text) || SCENE_NUMBER.test(b.text))
   const firstPageLines = body.filter((b) => b.page === body[0].page)
   const pagesInBody = new Set(body.map((b) => b.page)).size
+  // A title page has no scenes and no paragraphs of prose.
+  const prose = (b: BodyLine) => b.col <= 3 && hasLower(b.text) && b.text.length > 45
   let start = 0
-  if (pagesInBody > 1 && !firstPageLines.some(isHeadingStart) && firstPageLines.length <= 30) {
+  if (pagesInBody > 1 && !firstPageLines.some(isHeadingStart) && !firstPageLines.some(prose) && firstPageLines.length <= 30) {
     titlePage = parseTitleBlock(firstPageLines)
     start = firstPageLines.length
   } else {
@@ -441,7 +468,7 @@ export function classifyLayout(raw: LayoutTextLine[], charWidth: number, pageHei
       continue
     }
 
-    if (b.col <= 3 && (looksLikeSceneHeading(t) || /^(INT|EXT)\b/.test(t) || (pendingNumber && isUpper(t) && t.length <= 70))) {
+    if (b.col <= 3 && (looksLikeSceneHeading(t) || /^(INT|EXT)\b/.test(t) || ((pendingNumber || b.numbered) && isUpper(t) && t.length <= 70))) {
       pendingNumber = false
       state = 'none'
       speaker = ''

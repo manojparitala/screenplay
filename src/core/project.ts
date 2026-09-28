@@ -107,7 +107,8 @@ export function detectFormat(fileName: string, text: string): ImportFormat {
   const lower = fileName.toLowerCase()
   if (lower.endsWith('.fdx') || /^\s*<\?xml[\s\S]{0,200}<FinalDraft/.test(text) || /^\s*<FinalDraft/.test(text)) return 'fdx'
   if (lower.endsWith('.json') || /^\s*\{/.test(text)) return 'json'
-  if (!lower.endsWith('.fountain') && !lower.endsWith('.spmd') && looksIndented(text)) return 'indented'
+  // Fountain saved from the claude.ai viewer ends in .fountain.txt.
+  if (!/\.(fountain|spmd)(\.txt)?$/.test(lower) && looksIndented(text)) return 'indented'
   return 'fountain'
 }
 
@@ -134,15 +135,47 @@ export function projectFromFile(fileName: string, text: string): Project {
 /** Build a project from elements recovered from a laid-out script (PDF or indented text). */
 export function projectFromParsed(fileName: string, parsed: LayoutImport): Project {
   const p = createProject('')
-  const fallbackTitle = fileName.replace(/\.[^.]+$/, '')
+  const fallbackTitle = fileName.replace(/(\.(fountain|spmd))?\.[^.]+$/i, '')
   p.titlePage = { ...p.titlePage, ...parsed.titlePage }
   if (!p.titlePage.title.trim()) p.titlePage.title = fallbackTitle
   if (parsed.elements.length) p.script = parsed.elements
   return p
 }
 
+/** Longest file name we produce, in bytes of UTF-8, leaving room for the extension within every file system's 255. */
+const MAX_NAME_BYTES = 150
+
+/** Cut text to at most `max` bytes of UTF-8 without splitting a character. */
+function clipUtf8(text: string, max: number): string {
+  const encoder = new TextEncoder()
+  if (encoder.encode(text).length <= max) return text
+  let out = ''
+  let size = 0
+  for (const { segment } of new Intl.Segmenter().segment(text)) {
+    size += encoder.encode(segment).length
+    if (size > max) break
+    out += segment
+  }
+  return out
+}
+
+/**
+ * A file name for a title that every operating system accepts. Letters in
+ * any language and typographic punctuation are kept; characters Windows
+ * forbids become spaces, and invisible formatting characters are dropped.
+ */
 export function safeFileName(title: string): string {
-  return (title.trim() || 'screenplay').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').slice(0, 80)
+  const name = clipUtf8(
+    title
+      .normalize('NFC')
+      .replace(/(?![\u200c\u200d])\p{Cf}/gu, '')
+      .replace(/\s*:\s+/g, ' - ')
+      .replace(/[\\/:*?"<>|\p{Cc}]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^[\s.]+|[\s.]+$/g, ''),
+    MAX_NAME_BYTES,
+  ).replace(/[\s.]+$/, '')
+  return /[\p{L}\p{N}\p{S}]/u.test(name) ? name : 'screenplay'
 }
 
 /** Plain text of every element, for quick previews and word counts. */

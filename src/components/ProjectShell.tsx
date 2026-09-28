@@ -24,7 +24,7 @@ import { useEffect, type ComponentType } from 'react'
 import { ELEMENTS } from '../core/elements'
 import { toFdx } from '../core/fdx'
 import { toFountain } from '../core/fountain'
-import { exportPdf } from '../core/pdf'
+import { exportPdf, pdfUnsupportedCharacters } from '../core/pdf'
 import { projectTitle, safeFileName, serializeProject } from '../core/project'
 import { useApp, type ViewId } from '../store/app'
 import { useAnalysis, useEditorState, usePagination, useProject } from '../store/hooks'
@@ -42,7 +42,8 @@ import { TitlePageView } from '../views/TitlePageView'
 import { HelpDialog } from './HelpDialog'
 import { SettingsDialog } from './SettingsDialog'
 import { SnapshotsDialog } from './SnapshotsDialog'
-import { downloadFile, formatRuntime, Menu } from './ui'
+import { canPrint, saveFile } from './save'
+import { formatRuntime, Menu } from './ui'
 
 const TABS: { id: ViewId; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { id: 'script', label: 'Script', icon: FileText },
@@ -66,13 +67,24 @@ export async function exportAs(kind: 'pdf' | 'fountain' | 'fdx' | 'json') {
   try {
     if (kind === 'pdf') {
       const blob = await exportPdf(data.script, { settings: data.settings, titlePage: data.titlePage })
-      downloadFile(`${base}.pdf`, blob)
+      const saved = await saveFile(`${base}.pdf`, blob, 'application/pdf')
+      const missing = pdfUnsupportedCharacters(data.script, data.settings.includeTitlePage ? data.titlePage : undefined)
+      if (saved && missing.length) {
+        const sample = missing.slice(0, 6).join(' ')
+        s.notify(
+          `The PDF’s Courier font can’t show some characters in this script (${sample}${missing.length > 6 ? ' …' : ''}), so they appear as “?”. ` +
+            (canPrint()
+              ? 'To keep them, open Preview, choose Print and save as PDF.'
+              : 'Fountain and Final Draft exports keep every character.'),
+          'error',
+        )
+      }
     } else if (kind === 'fountain') {
-      downloadFile(`${base}.fountain`, toFountain(data.script, data.titlePage))
+      await saveFile(`${base}.fountain`, toFountain(data.script, data.titlePage))
     } else if (kind === 'fdx') {
-      downloadFile(`${base}.fdx`, toFdx(data.script, data.titlePage), 'application/xml')
+      await saveFile(`${base}.fdx`, toFdx(data.script, data.titlePage), 'application/xml')
     } else {
-      downloadFile(`${base}.screenplay.json`, serializeProject(data), 'application/json')
+      await saveFile(`${base}.screenplay.json`, serializeProject(data), 'application/json')
     }
   } catch (e) {
     s.notify(`Export failed: ${(e as Error).message}`, 'error')
@@ -110,18 +122,22 @@ function ExportMenu() {
             {item('Final Draft', '.fdx', () => void exportAs('fdx'))}
             <div className="menu-sep" />
             {item('Project backup', '.json', () => void exportAs('json'))}
-            <div className="menu-sep" />
-            <button
-              className="menu-item"
-              role="menuitem"
-              onClick={() => {
-                close()
-                setView('preview')
-                setTimeout(() => window.print(), 300)
-              }}
-            >
-              <Printer size={15} /> Print…
-            </button>
+            {canPrint() && (
+              <>
+                <div className="menu-sep" />
+                <button
+                  className="menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    close()
+                    setView('preview')
+                    setTimeout(() => window.print(), 300)
+                  }}
+                >
+                  <Printer size={15} /> Print…
+                </button>
+              </>
+            )}
           </>
         )
       }}
@@ -207,7 +223,7 @@ export function ProjectShell() {
       } else if (mod && e.key.toLowerCase() === 'p') {
         e.preventDefault()
         setView('preview')
-        setTimeout(() => window.print(), 300)
+        if (canPrint()) setTimeout(() => window.print(), 300)
       } else if (e.key === 'F1' || (mod && e.key === '/')) {
         e.preventDefault()
         setDialog('help')

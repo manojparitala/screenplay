@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Library } from './components/Library'
 import { ProjectShell } from './components/ProjectShell'
+import { hostDownloads } from './components/save'
 import { Toasts } from './components/ui'
 import { useApp } from './store/app'
 
@@ -10,6 +11,8 @@ export function App() {
   const theme = useApp((s) => s.prefs.theme)
 
   useEffect(() => {
+    // Ask the artifact viewer (if any) for its downloads capability early, so saving never waits on it.
+    void hostDownloads()
     const { init, openProject } = useApp.getState()
     void init().then(() => {
       const m = location.hash.match(/^#\/project\/([\w-]+)/)

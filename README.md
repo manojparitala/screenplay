@@ -52,16 +52,26 @@ Your scripts stay on your machine, saved in the browser's own storage (IndexedDB
 ### Reports
 - Page count, estimated runtime, scenes, words, speaking characters, locations and dialogue share.
 - Charts of dialogue by character, interior/exterior split, time of day and scene lengths in script order.
-- A scene breakdown table with lengths in eighths, which you can export as CSV.
+- A scene breakdown table with lengths in eighths, which you can export as CSV (UTF-8 with a byte-order mark, so Excel shows accents and other alphabets correctly).
 
 ### Output & safety
 - **Export**: PDF with an optional title page, Fountain (`.fountain`), Final Draft (`.fdx`) and a full project backup (`.json`).
+  - Files are named after the script's title as you typed it, in any language; only characters that file systems reject (such as `/ : * ? " < > |`) are replaced.
 - **Import**: PDF, Fountain, Final Draft, indented plain-text scripts and project backups. You can also drop a file onto the library.
   - PDF import rebuilds the script from the page layout: indentation, capitals and bold tell scene headings, action, character cues, parentheticals and dialogue apart. Page numbers, headers and footers, (MORE)/(CONT'D), scene numbers and revision marks are removed, and speeches split across pages are rejoined. It works with scripts exported from screenwriting software and with web pages saved as PDF (for example from IMSDb). Scanned PDFs need text recognition (OCR) first.
 - **Print preview** drawn from exactly the same layout as the PDF, and **Print** straight from the browser.
 - **Title page** editor with a live preview.
 - **Snapshots**: save named copies of the script (for example "First draft" or "Before Act 2 rewrite"). You can restore one later; the current version is snapshotted first, so nothing is lost.
 - Autosaves as you type.
+
+### Opened from claude.ai
+
+When the app is opened as a claude.ai artifact, it runs inside the artifact viewer, which doesn't let pages start downloads or print. Exports go through the viewer instead: it asks you to confirm each file before saving it. The viewer only saves certain file types, so:
+
+- PDF, project backups (`.json`) and the CSV report are saved as usual.
+- Fountain scripts are saved as `.fountain.txt`. The contents are unchanged, and Fountain apps open `.txt` files.
+- Final Draft scripts are saved inside a `.zip` file. Unzip it to get the `.fdx`.
+- **Print** isn't offered there. Use **Download PDF** and print the PDF.
 
 ## Getting started
 
@@ -128,5 +138,5 @@ npm run test:e2e   # browser tests (Playwright; builds and serves the app)
 ## Known limitations
 
 - Dual (side-by-side) dialogue is imported as regular dialogue.
-- The downloadable PDF uses the standard Courier font, which only covers Western European characters. For scripts in other scripts (Devanagari, CJK, Cyrillic and so on), use **Preview → Print**, which uses the browser's fonts.
+- The downloadable PDF uses the standard Courier font, which only covers Western European characters. Accents it lacks are dropped (ő becomes o), and other characters (Tamil, Devanagari, Cyrillic, CJK, emoji and so on) print as “?”; the app warns you when this happens. To keep them, use **Preview → Print** and save as PDF, which uses the browser's fonts. Fountain, Final Draft and backup files keep every character.
 - Revision marks and coloured revision pages, locked scene numbers and real-time collaboration are not implemented yet.

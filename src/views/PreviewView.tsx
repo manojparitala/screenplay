@@ -2,6 +2,7 @@ import { Download, Printer } from 'lucide-react'
 import { useDeferredValue, useMemo, useState } from 'react'
 import { drawScript } from '../core/pdf'
 import { exportAs } from '../components/ProjectShell'
+import { canPrint } from '../components/save'
 import { recordSheets, Sheet } from '../components/Sheets'
 import { useElements, useProject } from '../store/hooks'
 
@@ -31,9 +32,11 @@ export function PreviewView() {
             </option>
           ))}
         </select>
-        <button className="btn" onClick={() => window.print()}>
-          <Printer size={16} /> Print
-        </button>
+        {canPrint() && (
+          <button className="btn" onClick={() => window.print()}>
+            <Printer size={16} /> Print
+          </button>
+        )}
         <button
           className="btn primary"
           disabled={busy}

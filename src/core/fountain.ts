@@ -249,7 +249,10 @@ export function parseFountain(source: string): FountainDocument {
     // Centered text: > text <
     const centered = content.match(/^>\s*(.*?)\s*<$/)
     if (centered) {
-      pushText('centered', centered[1])
+      // Consecutive centered lines form one centered block.
+      const last = elements[elements.length - 1]
+      if (last && last.type === 'centered' && !blank(i - 1)) last.runs = normalizeRuns([...last.runs, { text: '\n' }, ...parseEmphasis(centered[1])])
+      else pushText('centered', centered[1])
       i++
       continue
     }
@@ -408,17 +411,24 @@ export function toFountain(elements: ScriptElement[], titlePage?: Partial<TitleP
       }
       case 'transition': {
         flushGroup()
-        const t = body.toUpperCase()
+        // Transitions are one line in Fountain.
+        const t = body.replace(/\s*\n\s*/g, ' ').toUpperCase()
         blocks.push(isTransitionText(t.trim()) ? t : `> ${t}`)
         break
       }
       case 'centered':
         flushGroup()
-        blocks.push(`> ${body} <`)
+        // Fountain centres line by line, so every line gets its own markers.
+        blocks.push(
+          body
+            .split('\n')
+            .map((l) => `> ${l.trim()} <`)
+            .join('\n'),
+        )
         break
       case 'section':
         flushGroup()
-        blocks.push(`${'#'.repeat(Math.max(1, Math.min(6, el.level ?? 1)))} ${raw}`)
+        blocks.push(`${'#'.repeat(Math.max(1, Math.min(6, el.level ?? 1)))} ${raw.replace(/\s*\n\s*/g, ' ')}`)
         break
       case 'note':
         flushGroup()

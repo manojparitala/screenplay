@@ -128,6 +128,21 @@ describe('toFountain', () => {
     expect(second.elements.map((e) => e.synopsis)).toEqual(first.elements.map((e) => e.synopsis))
   })
 
+  it('keeps multi-line centered text and one-line transitions', () => {
+    const els: ScriptElement[] = [
+      { type: 'centered', runs: [{ text: 'PART I\nAFRICA\n3,000,000 YEARS AGO' }] },
+      { type: 'action', runs: [{ text: 'Dust.' }] },
+      { type: 'transition', runs: [{ text: 'SMASH\nCUT TO:' }] },
+    ]
+    const out = toFountain(els)
+    expect(out).toContain('> PART I <\n> AFRICA <\n> 3,000,000 YEARS AGO <')
+    expect(simplify(parseFountain(out).elements)).toEqual([
+      ['centered', 'PART I\nAFRICA\n3,000,000 YEARS AGO'],
+      ['action', 'Dust.'],
+      ['transition', 'SMASH CUT TO:'],
+    ])
+  })
+
   it('forces ambiguous elements', () => {
     const els: ScriptElement[] = [
       { type: 'action', runs: [{ text: 'BANG' }] },

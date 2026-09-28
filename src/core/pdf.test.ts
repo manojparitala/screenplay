@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseFountain } from './fountain'
-import { drawScript, exportPdf, type PdfSurface } from './pdf'
+import { drawScript, exportPdf, pdfUnsupportedCharacters, type PdfSurface } from './pdf'
 import { SAMPLE_FOUNTAIN } from './sample'
 import { DEFAULT_SETTINGS, emptyTitlePage } from './types'
 
@@ -45,6 +45,19 @@ describe('pdf layout', () => {
     })
     expect(r.calls[0].text).not.toBe('THE LAST LIGHTHOUSE')
     expect(r.calls.filter((c) => c.text === '1').length).toBe(2)
+  })
+
+  it('limits downloaded PDFs to the Courier character set but keeps previews in Unicode', () => {
+    const els = parseFountain('INT. CAFÉ - NIGHT\n\nவாலி smiles. Łukasz waves.\n').elements
+    const pdf = recorder()
+    drawScript(pdf.surface, els, { settings: { ...DEFAULT_SETTINGS, includeTitlePage: false }, charset: 'pdf' })
+    expect(pdf.calls.map((c) => c.text)).toContain('?? smiles. Lukasz waves.')
+    expect(pdf.calls.map((c) => c.text)).toContain('INT. CAFÉ - NIGHT')
+    const preview = recorder()
+    drawScript(preview.surface, els, { settings: { ...DEFAULT_SETTINGS, includeTitlePage: false } })
+    expect(preview.calls.map((c) => c.text)).toContain('வாலி smiles. Łukasz waves.')
+    expect(pdfUnsupportedCharacters(els)).toEqual(['வா', 'லி'])
+    expect(pdfUnsupportedCharacters(elements, tp)).toEqual([])
   })
 
   it('produces a PDF blob with jsPDF', async () => {

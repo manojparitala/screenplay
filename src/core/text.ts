@@ -68,3 +68,53 @@ export function asciiSafe(text: string): string {
     .replace(/…/g, '...')
     .replace(/ /g, ' ')
 }
+
+/* ------------------------------------------------------------------ */
+/* Characters the standard PDF fonts can draw                          */
+/* ------------------------------------------------------------------ */
+
+/** Windows-1252 characters outside Latin-1 that the standard PDF fonts include. */
+const CP1252_EXTRA = '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ'
+
+/** Letters that don't decompose into a base letter plus accents. */
+const LETTER_FALLBACK: Record<string, string> = {
+  Ł: 'L', ł: 'l', Đ: 'D', đ: 'd', Ħ: 'H', ħ: 'h', ı: 'i', Ŀ: 'L', ŀ: 'l', Ŋ: 'N', ŋ: 'n', Ŧ: 'T', ŧ: 't', ĸ: 'k',
+  Ǥ: 'G', ǥ: 'g', Ɨ: 'I', ɨ: 'i', Ƶ: 'Z', ƶ: 'z', Ø: 'O', ø: 'o', Æ: 'AE', æ: 'ae', Œ: 'OE', œ: 'oe', ß: 'ss',
+  Þ: 'Th', þ: 'th', Ð: 'D', ð: 'd', ʼ: "'", ʻ: "'", '‐': '-', '‑': '-', '‒': '-', '―': '-',
+  '−': '-', '′': "'", '″': '"', '\t': ' ',
+}
+
+function inPdfCharset(ch: string): boolean {
+  const c = ch.codePointAt(0)!
+  return c === 0x0a || (c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || CP1252_EXTRA.includes(ch)
+}
+
+/**
+ * Rewrite text for the standard PDF fonts (Windows-1252). Accented letters
+ * outside that set lose their accents (ő → o, Ł → L); anything else that
+ * can't be drawn, such as Tamil, CJK or emoji, becomes "?" (one per
+ * character), so the rest of the line still prints correctly.
+ */
+export function toPdfCharset(text: string): { text: string; missing: string[] } {
+  let out = ''
+  const missing: string[] = []
+  for (const cluster of text.match(/\P{M}\p{M}*|\p{M}+/gu) ?? []) {
+    if ([...cluster].every(inPdfCharset)) {
+      out += cluster
+      continue
+    }
+    const composed = cluster.normalize('NFC')
+    if ([...composed].every(inPdfCharset)) {
+      out += composed
+      continue
+    }
+    const base = [...cluster.normalize('NFD').replace(/\p{M}/gu, '')].map((c) => (inPdfCharset(c) ? c : LETTER_FALLBACK[c]))
+    if (base.length && base.every((c) => c !== undefined)) {
+      out += base.join('')
+      continue
+    }
+    out += '?'
+    missing.push(cluster)
+  }
+  return { text: out, missing }
+}

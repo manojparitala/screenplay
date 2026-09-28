@@ -21,7 +21,8 @@ import { useRef, useState, type DragEvent } from 'react'
 import { projectTitle, safeFileName, serializeProject } from '../core/project'
 import type { Project } from '../core/types'
 import { useApp } from '../store/app'
-import { downloadFile, Menu, Modal, timeAgo } from './ui'
+import { saveFile } from './save'
+import { Menu, Modal, timeAgo } from './ui'
 
 const ACCEPT = '.fountain,.spmd,.txt,.fdx,.pdf,.json,.md'
 
@@ -148,7 +149,7 @@ export function Library() {
                           className="menu-item"
                           onClick={() => {
                             close()
-                            downloadFile(`${safeFileName(projectTitle(p))}.screenplay.json`, serializeProject(p), 'application/json')
+                            void saveFile(`${safeFileName(projectTitle(p))}.screenplay.json`, serializeProject(p), 'application/json')
                           }}
                         >
                           <Download size={16} /> Download backup

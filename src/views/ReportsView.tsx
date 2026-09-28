@@ -2,7 +2,8 @@ import { Download } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { formatEighths, toEighths } from '../core/paginate'
 import { projectTitle, safeFileName } from '../core/project'
-import { downloadFile, formatRuntime } from '../components/ui'
+import { saveFile } from '../components/save'
+import { formatRuntime } from '../components/ui'
 import { useTooltip } from '../components/viz'
 import { useApp } from '../store/app'
 import { useAnalysis, useController, usePagination, useProject } from '../store/hooks'
@@ -88,13 +89,15 @@ export function ReportsView() {
   }
 
   const exportCsv = () => {
-    const esc = (v: string | number) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
+    const esc = (v: string | number) => (/[",\r\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
     const rows = [['Scene', 'Heading', 'INT/EXT', 'Location', 'Time', 'Page', 'Length (eighths)', 'Length', 'Characters', 'Synopsis']]
     for (const r of sceneRows) {
       const s = r.scene
       rows.push([String(s.number), s.heading, s.parts.intExt, s.parts.location, s.parts.time, String(r.page), String(r.eighths), formatEighths(r.eighths), s.characters.join('; '), s.synopsis])
     }
-    downloadFile(`${safeFileName(projectTitle(project))} - scene report.csv`, rows.map((r) => r.map(esc).join(',')).join('\n'), 'text/csv;charset=utf-8')
+    // The byte-order mark tells Excel the file is UTF-8; CRLF line ends follow RFC 4180.
+    const csv = '\ufeff' + rows.map((r) => r.map(esc).join(',')).join('\r\n') + '\r\n'
+    void saveFile(`${safeFileName(projectTitle(project))} - scene report.csv`, csv, 'text/csv;charset=utf-8')
   }
 
   return (

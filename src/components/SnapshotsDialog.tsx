@@ -6,7 +6,8 @@ import type { Snapshot } from '../core/types'
 import { useApp } from '../store/app'
 import * as db from '../store/db'
 import { useProject } from '../store/hooks'
-import { downloadFile, Modal, timeAgo } from './ui'
+import { saveFile } from './save'
+import { Modal, timeAgo } from './ui'
 
 export function SnapshotsDialog({ onClose }: { onClose: () => void }) {
   const project = useProject()
@@ -70,7 +71,7 @@ export function SnapshotsDialog({ onClose }: { onClose: () => void }) {
                       className="icon-btn small"
                       aria-label="Download as Fountain"
                       title="Download as Fountain"
-                      onClick={() => downloadFile(`${safeFileName(s.name)}.fountain`, toFountain(s.script, s.titlePage))}
+                      onClick={() => void saveFile(`${safeFileName(s.name)}.fountain`, toFountain(s.script, s.titlePage))}
                     >
                       <Download size={15} />
                     </button>

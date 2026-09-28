@@ -8,6 +8,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'retain-on-failure',
+    // Writers' computers use UTF-8. In the C locale, Chrome on Linux saves any
+    // download whose name isn't plain ASCII as "download".
+    launchOptions: { env: { ...process.env, LC_ALL: 'C.UTF-8' } },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1400, height: 900 } } }],
   webServer: {

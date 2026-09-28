@@ -231,18 +231,6 @@ export function Toasts() {
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-export function downloadFile(name: string, data: Blob | string, type = 'text/plain;charset=utf-8') {
-  const blob = typeof data === 'string' ? new Blob([data], { type }) : data
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-
 const AVATAR_COLORS = ['--c-blue', '--c-teal', '--c-purple', '--c-orange', '--c-green', '--c-pink', '--c-red', '--c-yellow']
 
 export function avatarColor(name: string): string {
