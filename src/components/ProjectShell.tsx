@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   ChartColumn,
   ChartGantt,
+  ChartNetwork,
   CircleQuestionMark,
   Clock,
   Download,
@@ -33,6 +34,7 @@ import { CharactersView } from '../views/CharactersView'
 import { LocationsView } from '../views/LocationsView'
 import { NotesView } from '../views/NotesView'
 import { PreviewView } from '../views/PreviewView'
+import { RelationshipsView } from '../views/RelationshipsView'
 import { ReportsView } from '../views/ReportsView'
 import { ScriptView } from '../views/ScriptView'
 import { TimelineView } from '../views/TimelineView'
@@ -48,6 +50,7 @@ const TABS: { id: ViewId; label: string; icon: ComponentType<{ size?: number }> 
   { id: 'beats', label: 'Beats', icon: Route },
   { id: 'characters', label: 'Characters', icon: Users },
   { id: 'timeline', label: 'Timeline', icon: ChartGantt },
+  { id: 'relationships', label: 'Relationships', icon: ChartNetwork },
   { id: 'locations', label: 'Locations', icon: MapPin },
   { id: 'reports', label: 'Reports', icon: ChartColumn },
   { id: 'title', label: 'Title Page', icon: Type },
@@ -273,6 +276,7 @@ export function ProjectShell() {
         {view === 'beats' && <BeatsView />}
         {view === 'characters' && <CharactersView />}
         {view === 'timeline' && <TimelineView />}
+        {view === 'relationships' && <RelationshipsView />}
         {view === 'locations' && <LocationsView />}
         {view === 'reports' && <ReportsView />}
         {view === 'title' && <TitlePageView />}

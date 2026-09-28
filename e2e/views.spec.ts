@@ -17,6 +17,7 @@ test('every view renders the sample script without errors', async ({ page }) => 
     ['Beats', '.beat'],
     ['Characters', '.detail-title'],
     ['Timeline', '.journeys'],
+    ['Relationships', '.network svg'],
     ['Locations', '.detail-title'],
     ['Reports', '.kpi'],
     ['Title Page', '.sheet'],
@@ -155,4 +156,22 @@ test('shows a character’s journey on their profile', async ({ page }) => {
   await page.getByRole('button', { name: 'Characters', exact: true }).click()
   await page.locator('.list-item', { hasText: 'IDA' }).click()
   await expect(page.locator('.path-place')).toHaveText(['LIGHTHOUSE - LAMP ROOM', 'HARBOR'])
+})
+
+test('relationships show who talks with whom', async ({ page }) => {
+  await openSample(page)
+  await page.getByRole('button', { name: 'Relationships', exact: true }).click()
+  // Three talking pairs, strongest first.
+  await expect(page.locator('.partner-row .partner-name')).toHaveText(['MAREN & TEO', 'MAREN & IDA', 'IDA & YOUNG FISHERMAN'])
+  await expect(page.locator('.network .node')).toHaveCount(4)
+  // Selecting Ida lists her conversation partners.
+  await page.getByRole('button', { name: /^IDA: talks with/ }).click()
+  await expect(page.locator('.network-side h3')).toHaveText('IDA talks with')
+  await expect(page.locator('.network-side .partner-name')).toHaveText(['MAREN', 'YOUNG FISHERMAN'])
+  // The matrix can switch between conversations and shared scenes.
+  await page.getByRole('radio', { name: 'Shared scenes' }).click()
+  await expect(page.locator('table.matrix td.diag').first()).toHaveText('4')
+  // Scene chips open the script at that scene.
+  await page.locator('.partners').last().locator('.scene-num-chip').first().click()
+  await expect(page.locator('.script-editor')).toBeVisible()
 })

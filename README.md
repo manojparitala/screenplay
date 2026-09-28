@@ -39,9 +39,15 @@ Your scripts stay on your machine, saved in the browser's own storage (IndexedDB
 ### Character timeline
 - **Journeys**: each character is a line moving between locations in script order. You can see where they go, when their paths cross, and when they are off-screen. Follow up to 8 characters at once; hover a point to see who is there and how much they say, and click to open the scene.
 - **Scene presence**: a character-by-scene grid showing who is in every scene, shaded by how much they speak. Characters who are only named in the action are marked separately.
-- **Shared scenes**: how many scenes each pair of characters appear in together.
 - Each character's profile shows their own journey: a strip across the whole script and the ordered path of places they visit.
 - Options to group sub-locations (HOUSE - KITCHEN → HOUSE) and to count characters who are named in the action but don't speak.
+
+### Relationships
+- **Conversation map**: a network of who talks with whom. Lines join characters who exchange dialogue, thicker for more exchanges; bigger circles speak more. Select a character to highlight their conversations and list their partners.
+- **Strongest pairs**: pairs ranked by lines exchanged, with the scenes where they talk (click to open).
+- **Who talks with whom**: a matrix of lines exchanged, or of scenes shared, for every pair.
+- Each character's profile shows who they talk with and in which scenes.
+- An exchange is counted each time one character's speech is followed by a different character's speech in the same scene.
 
 ### Reports
 - Page count, estimated runtime, scenes, words, speaking characters, locations and dialogue share.
@@ -96,7 +102,7 @@ src/
     fdx.ts         Final Draft XML reader and writer
     pdf.ts         PDF drawing via jsPDF (and the print preview uses the same drawing code)
     analysis.ts    scenes, characters, locations, word counts, renaming
-    tracking.ts    who is in which scene and where: journeys, presence, shared scenes
+    tracking.ts    who is in which scene and where, and who talks with whom
     beats.ts       beat sheet templates
   editor/      ProseMirror editor
     schema.ts      one node type per screenplay element
@@ -104,7 +110,7 @@ src/
     autocomplete.ts, plugins.ts   suggestions, page-break markers, find & replace, typewriter scrolling
     controller.ts  owns the editor state so every view edits the script through undoable transactions
   store/       zustand app state and IndexedDB persistence
-  views/       Script, Cards, Beats, Characters, Timeline, Locations, Reports, Title Page, Notes, Preview
+  views/       Script, Cards, Beats, Characters, Timeline, Relationships, Locations, Reports, Title Page, Notes, Preview
   components/  app shell, library, dialogs, shared UI
 e2e/           Playwright end-to-end tests
 ```

@@ -132,3 +132,90 @@ export function orderedPlaces(places: string[], sceneIndexes: Iterable<number>):
   })
   return out
 }
+
+/* ------------------------------------------------------------------ */
+/* Interactions: who talks with whom                                   */
+/* ------------------------------------------------------------------ */
+
+export interface PairInteraction {
+  a: string
+  b: string
+  /** Times the conversation passed from one of them straight to the other. */
+  exchanges: number
+  /** Scenes (indexes into analysis.scenes) where they talk with each other. */
+  sceneIndexes: number[]
+}
+
+export interface Interactions {
+  /** Characters in analysis order (most speeches first). */
+  names: string[]
+  /** Pairs that exchanged at least one line, strongest first. */
+  pairs: PairInteraction[]
+  /** Symmetric exchange counts, indexed like `names`. */
+  matrix: number[][]
+}
+
+/**
+ * Count conversation exchanges between characters. Within a scene, each time
+ * one character's speech is followed by a different character's speech, that
+ * pair exchanges a line. Action between speeches doesn't end the conversation;
+ * a new scene does.
+ */
+export function buildInteractions(elements: ScriptElement[], analysis: ScriptAnalysis): Interactions {
+  const names = analysis.characters.map((c) => c.name)
+  const index = new Map(names.map((n, i) => [n, i]))
+  const matrix = names.map(() => names.map(() => 0))
+  const pairs = new Map<string, PairInteraction>()
+
+  analysis.scenes.forEach((scene, si) => {
+    let last: string | null = null
+    for (let i = scene.index + 1; i < scene.end; i++) {
+      const el = elements[i]
+      if (el.type !== 'character') continue
+      const name = characterName(plainText(el))
+      if (!index.has(name)) continue
+      if (last && last !== name) {
+        const [a, b] = index.get(last)! < index.get(name)! ? [last, name] : [name, last]
+        const key = `${a}\u0000${b}`
+        let pair = pairs.get(key)
+        if (!pair) {
+          pair = { a, b, exchanges: 0, sceneIndexes: [] }
+          pairs.set(key, pair)
+        }
+        pair.exchanges++
+        if (pair.sceneIndexes[pair.sceneIndexes.length - 1] !== si) pair.sceneIndexes.push(si)
+        matrix[index.get(a)!][index.get(b)!]++
+        matrix[index.get(b)!][index.get(a)!]++
+      }
+      last = name
+    }
+  })
+
+  const sorted = [...pairs.values()].sort(
+    (x, y) => y.exchanges - x.exchanges || y.sceneIndexes.length - x.sceneIndexes.length || index.get(x.a)! - index.get(y.a)!,
+  )
+  return { names, pairs: sorted, matrix }
+}
+
+/**
+ * Order names around a circle so strongly connected characters sit next to
+ * each other: start with the best-connected character, then keep appending the
+ * one most tied to the last placed.
+ */
+export function circleOrder(names: string[], weight: (a: string, b: string) => number): string[] {
+  if (names.length <= 2) return [...names]
+  const total = (n: string) => names.reduce((s, m) => s + (m === n ? 0 : weight(n, m)), 0)
+  const rest = [...names].sort((a, b) => total(b) - total(a))
+  const out = [rest.shift()!]
+  while (rest.length) {
+    const lastPlaced = out[out.length - 1]
+    let best = 0
+    for (let i = 1; i < rest.length; i++) {
+      const wi = weight(lastPlaced, rest[i])
+      const wb = weight(lastPlaced, rest[best])
+      if (wi > wb) best = i
+    }
+    out.push(rest.splice(best, 1)[0])
+  }
+  return out
+}

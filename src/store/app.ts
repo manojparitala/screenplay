@@ -6,7 +6,7 @@ import type { Project, ScriptSettings, Snapshot } from '../core/types'
 import { ScriptController } from '../editor/controller'
 import * as db from './db'
 
-export type ViewId = 'script' | 'cards' | 'beats' | 'characters' | 'timeline' | 'locations' | 'reports' | 'title' | 'notes' | 'preview'
+export type ViewId = 'script' | 'cards' | 'beats' | 'characters' | 'timeline' | 'relationships' | 'locations' | 'reports' | 'title' | 'notes' | 'preview'
 export type DialogId = 'settings' | 'snapshots' | 'help' | null
 export type Theme = 'system' | 'light' | 'dark'
 export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error'

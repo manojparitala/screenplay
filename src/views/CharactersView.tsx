@@ -4,6 +4,7 @@ import { scenesMentioning, type SceneInfo } from '../core/analysis'
 import { emptyCharacterProfile, type CharacterProfile } from '../core/types'
 import { avatarColor, initials, LazyInput, LazyTextarea, Modal } from '../components/ui'
 import { useApp } from '../store/app'
+import { TalksWith } from './RelationshipsView'
 import { CharacterJourney } from './TimelineView'
 import { useAnalysis, useController, useElements, usePagination, useProject } from '../store/hooks'
 
@@ -177,6 +178,11 @@ export function CharactersView() {
             <div className="panel" style={{ padding: 16 }}>
               <h2 className="section-title">Journey</h2>
               <CharacterJourney name={current.name} />
+            </div>
+
+            <div className="panel viz-root" style={{ padding: 16 }}>
+              <h2 className="section-title">Talks with</h2>
+              <TalksWith name={current.name} onSelect={setSelected} />
             </div>
 
             <div className="panel" style={{ padding: 16 }}>

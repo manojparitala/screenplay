@@ -1,7 +1,7 @@
 import { ArrowRight, ChartGantt } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import type { SceneInfo } from '../core/analysis'
-import { characterPath, orderedPlaces, sharedScenes, type CharacterTrack, type Presence, type Tracking } from '../core/tracking'
+import { characterPath, orderedPlaces, type CharacterTrack, type Presence, type Tracking } from '../core/tracking'
 import { RAMP, SERIES, useTooltip, useWidth } from '../components/viz'
 import { useApp } from '../store/app'
 import { useAnalysis, useController, useTracking } from '../store/hooks'
@@ -10,7 +10,7 @@ const MAX_FOLLOWED = 8
 
 type Bind = ReturnType<typeof useTooltip>['bind']
 
-function useOpenScene(scenes: SceneInfo[]) {
+export function useOpenScene(scenes: SceneInfo[]) {
   const c = useController()
   const setView = useApp((s) => s.setView)
   return (sceneIndex: number) => {
@@ -22,11 +22,11 @@ function useOpenScene(scenes: SceneInfo[]) {
 }
 
 /** Word-count buckets for the one-hue ramp: upper bound of each of the 4 steps. */
-function rampEdges(max: number): number[] {
+export function rampEdges(max: number): number[] {
   return [0.25, 0.5, 0.75, 1].map((f) => Math.max(1, Math.ceil(max * f)))
 }
 
-function bucket(words: number, edges: number[]): number {
+export function bucket(words: number, edges: number[]): number {
   const i = edges.findIndex((e) => words <= e)
   return i === -1 ? edges.length - 1 : i
 }
@@ -331,73 +331,10 @@ function PresenceGrid(props: {
 }
 
 /* ------------------------------------------------------------------ */
-/* Shared scenes matrix                                                */
-/* ------------------------------------------------------------------ */
-
-function SharedMatrix({ tracks, bind }: { tracks: CharacterTrack[]; bind: Bind }) {
-  const m = sharedScenes(tracks)
-  const max = Math.max(1, ...m.flatMap((row, i) => row.filter((_, j) => j !== i)))
-  const edges = rampEdges(max)
-  return (
-    <div className="table-wrap">
-      <table className="matrix">
-        <thead>
-          <tr>
-            <th />
-            {tracks.map((t) => (
-              <th key={t.name} scope="col">
-                <span>{t.name}</span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {tracks.map((a, i) => (
-            <tr key={a.name}>
-              <th scope="row">{a.name}</th>
-              {tracks.map((b, j) => {
-                const v = m[i][j]
-                if (i === j)
-                  return (
-                    <td key={b.name} className="diag" {...bind(<><b className="tip-value">{v} scenes</b><span className="tip-row">{a.name} in total</span></>)} tabIndex={0}>
-                      {v}
-                    </td>
-                  )
-                const k = bucket(v, edges)
-                return (
-                  <td
-                    key={b.name}
-                    tabIndex={0}
-                    style={v ? { background: RAMP[k], color: `var(--ramp-ink-${k + 1})` } : undefined}
-                    className={v ? '' : 'zero'}
-                    {...bind(
-                      <>
-                        <b className="tip-value">
-                          {v} shared scene{v === 1 ? '' : 's'}
-                        </b>
-                        <span className="tip-row">
-                          {a.name} & {b.name}
-                        </span>
-                      </>,
-                    )}
-                  >
-                    {v || ''}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
 /* View                                                                */
 /* ------------------------------------------------------------------ */
 
-function Panel({ title, description, children, actions }: { title: string; description: string; children: ReactNode; actions?: ReactNode }) {
+export function Panel({ title, description, children, actions }: { title: string; description: string; children: ReactNode; actions?: ReactNode }) {
   return (
     <section className="panel report-card timeline-panel">
       <div className="panel-head">
@@ -457,7 +394,6 @@ export function TimelineView() {
   const rows = [...tracks].sort((a, b) =>
     sort === 'first' ? a.sceneIndexes[0] - b.sceneIndexes[0] || b.sceneIndexes.length - a.sceneIndexes.length : b.sceneIndexes.length - a.sceneIndexes.length,
   )
-  const matrixTracks = [...tracks].sort((a, b) => b.sceneIndexes.length - a.sceneIndexes.length).slice(0, 12)
 
   if (!tracking.scenes.length || !tracks.length) {
     return (
@@ -477,7 +413,7 @@ export function TimelineView() {
         <div className="view-header">
           <div>
             <h1>Character timeline</h1>
-            <p>Follow each character through the story: where they go, which scenes they are in, and who they share them with.</p>
+            <p>Follow each character through the story: where they go and which scenes they are in.</p>
           </div>
         </div>
 
@@ -571,14 +507,6 @@ export function TimelineView() {
           />
         </Panel>
 
-        {matrixTracks.length > 1 && (
-          <Panel
-            title="Shared scenes"
-            description={`How many scenes each pair of characters appear in together${tracks.length > 12 ? ' (the 12 characters in the most scenes)' : ''}. The diagonal shows each character’s total.`}
-          >
-            <SharedMatrix tracks={matrixTracks} bind={tooltip.bind} />
-          </Panel>
-        )}
       </div>
       {tooltip.node}
     </div>
