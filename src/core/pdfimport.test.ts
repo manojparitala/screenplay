@@ -26,7 +26,7 @@ describe('PDF import', () => {
         '\n\nTHE END\n',
     )
     const settings = { ...DEFAULT_SETTINGS, showSceneNumbers: true }
-    const blob = await exportPdf(elements, { settings, titlePage: { ...emptyTitlePage(), ...titlePage } })
+    const { blob } = await exportPdf(elements, { settings, titlePage: { ...emptyTitlePage(), ...titlePage } })
     const pages = await readPdfPages(new Uint8Array(await blob.arrayBuffer()), pdfjs as unknown as PdfJsLike)
     const result = parsePdfPages(pages)
 
@@ -42,7 +42,7 @@ describe('PDF import', () => {
     const { elements } = parseFountain(
       Array.from({ length: 30 }, (_, i) => `.MONTAGE ${i + 1} - THE CITY WAKES\n\nTRAFFIC SURGES ACROSS THE BRIDGE.\n\nPeople hurry past.\n`).join('\n'),
     )
-    const blob = await exportPdf(elements, { settings: { ...DEFAULT_SETTINGS, showSceneNumbers: true, includeTitlePage: false } })
+    const { blob } = await exportPdf(elements, { settings: { ...DEFAULT_SETTINGS, showSceneNumbers: true, includeTitlePage: false } })
     const pages = await readPdfPages(new Uint8Array(await blob.arrayBuffer()), pdfjs as unknown as PdfJsLike)
     const back = parsePdfPages(pages).elements
     expect(back.filter((e) => e.type === 'scene').map(plainText)).toEqual(elements.filter((e) => e.type === 'scene').map(plainText))

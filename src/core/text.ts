@@ -1,4 +1,5 @@
 import type { ScriptElement, TextRun } from './types'
+import { indicScriptOf } from './scripts'
 
 export function plainText(el: Pick<ScriptElement, 'runs'>): string {
   let s = ''
@@ -54,7 +55,8 @@ export function mapRunsText(runs: TextRun[], fn: (s: string) => string): TextRun
 }
 
 export function countWords(text: string): number {
-  const m = text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)
+  // Vowel signs and viramas (combining marks) and zero-width joiners are part of a word in Indian scripts.
+  const m = text.match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}\u200c\u200d'’-]*/gu)
   return m ? m.length : 0
 }
 
@@ -84,31 +86,34 @@ const LETTER_FALLBACK: Record<string, string> = {
   '−': '-', '′': "'", '″': '"', '\t': ' ',
 }
 
-function inPdfCharset(ch: string): boolean {
+function inPdfCharset(ch: string, keepIndic: boolean): boolean {
   const c = ch.codePointAt(0)!
-  return c === 0x0a || (c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || CP1252_EXTRA.includes(ch)
+  if (c === 0x0a || (c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || CP1252_EXTRA.includes(ch)) return true
+  return keepIndic && (indicScriptOf(c) !== null || c === 0x200c || c === 0x200d)
 }
 
 /**
- * Rewrite text for the standard PDF fonts (Windows-1252). Accented letters
- * outside that set lose their accents (ő → o, Ł → L); anything else that
- * can't be drawn, such as Tamil, CJK or emoji, becomes "?" (one per
+ * Rewrite text for the PDF's fonts: the standard Courier (Windows-1252), plus
+ * the bundled fonts for the Indic scripts when `keepIndic` is set. Accented
+ * letters outside that set lose their accents (ő → o, Ł → L); anything else
+ * that can't be drawn, such as CJK or emoji, becomes "?" (one per
  * character), so the rest of the line still prints correctly.
  */
-export function toPdfCharset(text: string): { text: string; missing: string[] } {
+export function toPdfCharset(text: string, keepIndic = false): { text: string; missing: string[] } {
+  const ok = (ch: string) => inPdfCharset(ch, keepIndic)
   let out = ''
   const missing: string[] = []
   for (const cluster of text.match(/\P{M}\p{M}*|\p{M}+/gu) ?? []) {
-    if ([...cluster].every(inPdfCharset)) {
+    if ([...cluster].every(ok)) {
       out += cluster
       continue
     }
     const composed = cluster.normalize('NFC')
-    if ([...composed].every(inPdfCharset)) {
+    if ([...composed].every(ok)) {
       out += composed
       continue
     }
-    const base = [...cluster.normalize('NFD').replace(/\p{M}/gu, '')].map((c) => (inPdfCharset(c) ? c : LETTER_FALLBACK[c]))
+    const base = [...cluster.normalize('NFD').replace(/\p{M}/gu, '')].map((c) => (ok(c) ? c : LETTER_FALLBACK[c]))
     if (base.length && base.every((c) => c !== undefined)) {
       out += base.join('')
       continue

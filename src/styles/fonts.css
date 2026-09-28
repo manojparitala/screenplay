@@ -1,0 +1,41 @@
+/*
+ * Fonts for Indian scripts: Noto Sans (SIL Open Font License, see
+ * src/assets/fonts/OFL.txt). Each covers only its own script, so the browser
+ * downloads a font only when a screenplay uses that script. The same files are
+ * embedded in exported PDFs (src/store/fonts.ts).
+ */
+
+@font-face {
+  font-family: 'Screenplay Devanagari';
+  src: url('../assets/fonts/NotoSansDevanagari-Regular.ttf') format('truetype');
+  unicode-range: U+0900-097F;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Screenplay Tamil';
+  src: url('../assets/fonts/NotoSansTamil-Regular.ttf') format('truetype');
+  unicode-range: U+0B80-0BFF;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Screenplay Telugu';
+  src: url('../assets/fonts/NotoSansTelugu-Regular.ttf') format('truetype');
+  unicode-range: U+0C00-0C7F;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Screenplay Kannada';
+  src: url('../assets/fonts/NotoSansKannada-Regular.ttf') format('truetype');
+  unicode-range: U+0C80-0CFF;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Screenplay Malayalam';
+  src: url('../assets/fonts/NotoSansMalayalam-Regular.ttf') format('truetype');
+  unicode-range: U+0D00-0D7F;
+  font-display: swap;
+}

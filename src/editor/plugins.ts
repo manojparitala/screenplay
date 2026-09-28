@@ -171,7 +171,7 @@ function escapeRegExp(s: string): string {
 export function findMatches(doc: PMNode, query: SearchQuery): { from: number; to: number }[] {
   if (!query.text) return []
   let source = escapeRegExp(query.text)
-  if (query.wholeWord) source = `(?<![\\p{L}\\p{N}_])${source}(?![\\p{L}\\p{N}_])`
+  if (query.wholeWord) source = `(?<![\\p{L}\\p{M}\\p{N}_])${source}(?![\\p{L}\\p{M}\\p{N}_])`
   const re = new RegExp(source, query.caseSensitive ? 'gu' : 'giu')
   const out: { from: number; to: number }[] = []
   doc.forEach((node, offset) => {

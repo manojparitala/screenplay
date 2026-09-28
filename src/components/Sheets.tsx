@@ -1,14 +1,5 @@
-import type { CSSProperties } from 'react'
-import type { PdfSurface } from '../core/pdf'
-
-type Style = 'normal' | 'bold' | 'italic' | 'bolditalic'
-
-interface SheetText {
-  text: string
-  x: number
-  y: number
-  style: Style
-}
+import type { PdfSurface, Style, TextSpan } from '../core/pdf'
+import { SCRIPTS } from '../core/scripts'
 
 interface SheetRule {
   x1: number
@@ -18,7 +9,7 @@ interface SheetRule {
 }
 
 export interface SheetData {
-  texts: SheetText[]
+  spans: TextSpan[]
   rules: SheetRule[]
 }
 
@@ -27,42 +18,58 @@ export interface SheetData {
  * from exactly the same layout as the downloaded PDF.
  */
 export function recordSheets(draw: (surface: PdfSurface) => void): SheetData[] {
-  const sheets: SheetData[] = [{ texts: [], rules: [] }]
-  let style: Style = 'normal'
+  const sheets: SheetData[] = [{ spans: [], rules: [] }]
   draw({
-    setFont: (s) => {
-      style = s
-    },
-    text: (text, x, y) => {
-      if (text) sheets[sheets.length - 1].texts.push({ text, x, y, style })
+    text: (span) => {
+      if (span.text) sheets[sheets.length - 1].spans.push(span)
     },
     line: (x1, y1, x2, y2) => sheets[sheets.length - 1].rules.push({ x1, y1, x2, y2 }),
-    addPage: () => sheets.push({ texts: [], rules: [] }),
+    addPage: () => sheets.push({ spans: [], rules: [] }),
   })
   return sheets
 }
 
-const pt = (v: number) => `calc(var(--sheet-scale, 1) * ${v}pt)`
+const isBold = (s: Style) => s === 'bold' || s === 'bolditalic'
+const isItalic = (s: Style) => s === 'italic' || s === 'bolditalic'
 
+/**
+ * One printed page. It is drawn as SVG in points, so every run sits on the
+ * same baseline and at the same position as in the PDF. Courier runs are
+ * stretched to the PDF's character width, since Courier Prime is a little wider.
+ */
 export function Sheet({ data, label }: { data: SheetData; label: string }) {
   return (
-    <div className="sheet" aria-label={label} role="img">
-      {data.texts.map((t, i) => {
-        const style: CSSProperties = { left: pt(t.x), top: pt(t.y) }
-        if (t.style === 'bold' || t.style === 'bolditalic') style.fontWeight = 700
-        if (t.style === 'italic' || t.style === 'bolditalic') style.fontStyle = 'italic'
-        return (
-          <span key={i} className="sheet-line" style={style}>
+    <svg className="sheet" viewBox="0 0 612 792" role="img" aria-label={label} xmlSpace="preserve">
+      {data.spans.map((t, i) =>
+        t.script ? (
+          <text
+            key={i}
+            x={t.x}
+            y={t.y}
+            className="sheet-indic"
+            style={{ fontFamily: `"${SCRIPTS[t.script].family}"` }}
+            fontWeight={isBold(t.style) ? 700 : undefined}
+            fontStyle={isItalic(t.style) ? 'italic' : undefined}
+          >
             {t.text}
-          </span>
-        )
-      })}
+          </text>
+        ) : (
+          <text
+            key={i}
+            x={t.x}
+            y={t.y}
+            textLength={t.width}
+            lengthAdjust="spacing"
+            fontWeight={isBold(t.style) ? 700 : undefined}
+            fontStyle={isItalic(t.style) ? 'italic' : undefined}
+          >
+            {t.text}
+          </text>
+        ),
+      )}
       {data.rules.map((r, i) => (
-        <span
-          key={`r${i}`}
-          style={{ position: 'absolute', left: pt(r.x1), top: pt(r.y1), width: pt(r.x2 - r.x1), borderTop: '0.6pt solid currentColor' }}
-        />
+        <line key={`r${i}`} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} />
       ))}
-    </div>
+    </svg>
   )
 }

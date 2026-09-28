@@ -394,7 +394,8 @@ export function toFountain(elements: ScriptElement[], titlePage?: Partial<TitleP
       case 'character': {
         flushGroup()
         const cue = raw.trim().toUpperCase()
-        group = [/\p{L}/u.test(cue) && !looksLikeSceneHeading(cue) ? cue : `@${cue}`]
+        // Fountain finds cues by their capitals; names in scripts without capitals (Tamil, Hindi…) need "@".
+        group = [isUpperCue(cue) && !looksLikeSceneHeading(cue) ? cue : `@${cue}`]
         break
       }
       case 'parenthetical':

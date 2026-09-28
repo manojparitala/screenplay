@@ -4,6 +4,7 @@ import { drawScript } from '../core/pdf'
 import { exportAs } from '../components/ProjectShell'
 import { canPrint } from '../components/save'
 import { recordSheets, Sheet } from '../components/Sheets'
+import { useScriptFontsVersion } from '../store/fonts'
 import { useElements, useProject } from '../store/hooks'
 
 export function PreviewView() {
@@ -12,9 +13,11 @@ export function PreviewView() {
   const [scale, setScale] = useState(0.9)
   const [busy, setBusy] = useState(false)
 
+  // Text in Indian scripts is measured with its font, so lay out again once a font has loaded.
+  const fontsVersion = useScriptFontsVersion()
   const sheets = useMemo(
     () => recordSheets((s) => drawScript(s, elements, { settings: project.settings, titlePage: project.titlePage })),
-    [elements, project.settings, project.titlePage],
+    [elements, project.settings, project.titlePage, fontsVersion],
   )
   const hasTitle = sheets.length > 0 && project.settings.includeTitlePage && !!(project.titlePage.title.trim() || project.titlePage.author.trim())
 

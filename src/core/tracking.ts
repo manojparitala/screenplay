@@ -53,7 +53,7 @@ export function placeOf(scene: SceneInfo, group: boolean): string {
 export function buildTracking(elements: ScriptElement[], analysis: ScriptAnalysis, opts: TrackingOptions): Tracking {
   const scenes = analysis.scenes
   const names = analysis.characters.map((c) => c.name)
-  const matchers = names.map((n) => new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(n)}(?=$|[^\\p{L}\\p{N}])`, 'iu'))
+  const matchers = names.map((n) => new RegExp(`(^|[^\\p{L}\\p{M}\\p{N}])${escapeRegExp(n)}(?=$|[^\\p{L}\\p{M}\\p{N}])`, 'iu'))
   const presence = new Map<string, (Presence | null)[]>(names.map((n) => [n, scenes.map(() => null)]))
 
   scenes.forEach((scene, si) => {

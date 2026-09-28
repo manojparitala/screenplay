@@ -4,6 +4,7 @@ import { ProjectShell } from './components/ProjectShell'
 import { hostDownloads } from './components/save'
 import { Toasts } from './components/ui'
 import { useApp } from './store/app'
+import { onScriptFontLoaded } from './store/fonts'
 
 export function App() {
   const ready = useApp((s) => s.ready)
@@ -18,6 +19,8 @@ export function App() {
       const m = location.hash.match(/^#\/project\/([\w-]+)/)
       if (m) void openProject(m[1])
     })
+    // Text in Indian scripts measures differently once its font has loaded: redo page breaks.
+    return onScriptFontLoaded(() => useApp.getState().controller?.relayout())
   }, [])
 
   // Only touch data-theme once the writer picks a theme, so a host page's own setting is left alone.

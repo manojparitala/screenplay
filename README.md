@@ -22,6 +22,14 @@ Your scripts stay on your machine, saved in the browser's own storage (IndexedDB
 - Scene numbers, colour-coded scenes, zoom, typewriter scrolling, focus mode, and dark mode.
 - **Paste a screenplay** as plain text or Fountain and it is formatted automatically. Copy several elements out and you get Fountain text.
 
+### Indian languages
+Write in **Hindi** (and other languages in Devanagari), **Tamil**, **Telugu**, **Kannada** and **Malayalam**, on their own or mixed with English on the same line.
+- The app bundles Noto Sans fonts for these scripts, so they display the same on every computer. A font is only downloaded when a script uses it.
+- Scene headings can mix languages, for example `INT. வீடு - இரவு`. Character names in these scripts work like any other: autocomplete, the Characters view, the timeline and relationships all pick them up.
+- These scripts have taller vowel signs than Courier, so a printed line holding them is 1¼ lines high, and page breaks account for it.
+- The PDF embeds the fonts and draws conjuncts and vowel signs correctly, using HarfBuzz, the text engine browsers use. Text in the PDF can be searched and copied, and the app can import its own PDFs again.
+- Fountain doesn't recognise character names written without capital letters, so the app writes them with Fountain's `@` marker (`@வாலி`).
+
 ### Planning
 - **Scene navigator** with synopses, filtering, act dividers and the page each scene starts on.
 - **Scene inspector**: synopsis, private notes, card colour, cast and length in eighths of a page for the scene the cursor is in.
@@ -60,6 +68,7 @@ Your scripts stay on your machine, saved in the browser's own storage (IndexedDB
 - **Import**: PDF, Fountain, Final Draft, indented plain-text scripts and project backups. You can also drop a file onto the library.
   - PDF import rebuilds the script from the page layout: indentation, capitals and bold tell scene headings, action, character cues, parentheticals and dialogue apart. Page numbers, headers and footers, (MORE)/(CONT'D), scene numbers and revision marks are removed, and speeches split across pages are rejoined. It works with scripts exported from screenwriting software and with web pages saved as PDF (for example from IMSDb). Scanned PDFs need text recognition (OCR) first.
 - **Print preview** drawn from exactly the same layout as the PDF, and **Print** straight from the browser.
+- PDFs are written by the app itself: Courier for Latin text (in the standard PDF font, so files stay small), and embedded font subsets for the Indian scripts.
 - **Title page** editor with a live preview.
 - **Snapshots**: save named copies of the script (for example "First draft" or "Before Act 2 rewrite"). You can restore one later; the current version is snapshotted first, so nothing is lost.
 - Autosaves as you type.
@@ -112,7 +121,11 @@ src/
     fountain.ts    Fountain parser and writer (title page, emphasis, forced elements, notes, sections)
     fdx.ts         Final Draft XML reader and writer
     pdfimport.ts   rebuilds screenplay elements from a laid-out PDF or indented text
-    pdf.ts         PDF drawing via jsPDF (and the print preview uses the same drawing code)
+    pdf.ts         draws the pages (the PDF and the print preview use the same drawing code)
+    pdfwriter.ts   writes PDF files: standard Courier text and embedded, shaped fonts
+    scripts.ts     the Indian scripts: finding them in text and measuring their width
+    shaper.ts      text shaping with HarfBuzz for the PDF
+    ttf.ts         reads TrueType fonts: metrics, outlines and subsets
     analysis.ts    scenes, characters, locations, word counts, renaming
     tracking.ts    who is in which scene and where, and who talks with whom
     beats.ts       beat sheet templates
@@ -121,7 +134,8 @@ src/
     commands.ts    Enter/Tab behaviour and smart typing
     autocomplete.ts, plugins.ts   suggestions, page-break markers, find & replace, typewriter scrolling
     controller.ts  owns the editor state so every view edits the script through undoable transactions
-  store/       zustand app state and IndexedDB persistence
+  store/       zustand app state, IndexedDB persistence, and loading fonts
+  assets/fonts Noto Sans for Devanagari, Tamil, Telugu, Kannada and Malayalam (SIL Open Font License, see OFL.txt)
   views/       Script, Cards, Beats, Characters, Timeline, Relationships, Locations, Reports, Title Page, Notes, Preview
   components/  app shell, library, dialogs, shared UI
 e2e/           Playwright end-to-end tests
@@ -138,5 +152,6 @@ npm run test:e2e   # browser tests (Playwright; builds and serves the app)
 ## Known limitations
 
 - Dual (side-by-side) dialogue is imported as regular dialogue.
-- The downloadable PDF uses the standard Courier font, which only covers Western European characters. Accents it lacks are dropped (ő becomes o), and other characters (Tamil, Devanagari, Cyrillic, CJK, emoji and so on) print as “?”; the app warns you when this happens. To keep them, use **Preview → Print** and save as PDF, which uses the browser's fonts. Fountain, Final Draft and backup files keep every character.
+- The downloadable PDF shows Latin-alphabet text (in Courier, which covers Western European characters) and the five Indian scripts above. Accents Courier lacks are dropped (ő becomes o), and characters of other scripts (Bengali, Gujarati, Gurmukhi, Odia, Cyrillic, CJK, emoji and so on) print as “?”; the app warns you when this happens. To keep them, use **Preview → Print** and save as PDF, which uses the browser's fonts. Fountain, Final Draft and backup files keep every character.
+- Bold and italic text in the Indian scripts is drawn by thickening and slanting the regular font, as browsers do.
 - Revision marks and coloured revision pages, locked scene numbers and real-time collaboration are not implemented yet.

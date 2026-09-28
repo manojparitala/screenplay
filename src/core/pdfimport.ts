@@ -1,5 +1,6 @@
 import { uid } from './id'
 import { looksLikeSceneHeading, characterName } from './scene'
+import { hasIndic } from './scripts'
 import { normalizeRuns, plainText } from './text'
 import type { ScriptElement, TitlePage } from './types'
 
@@ -74,24 +75,30 @@ function median(values: number[]): number {
 /* ------------------------------------------------------------------ */
 
 export function linesFromPdfPages(pages: PdfPage[]): { lines: LayoutTextLine[]; charWidth: number } {
+  // Character width comes from Courier text; Indian scripts are set in other fonts at other widths.
+  const courierLike = (it: PdfItem) => !hasIndic(it.str)
   const widths: number[] = []
   for (const p of pages)
     for (const it of p.items) {
       const t = it.str.trim()
-      if (t.length >= 3 && it.width > 0) widths.push(it.width / it.str.length)
+      if (t.length >= 3 && it.width > 0 && courierLike(it)) widths.push(it.width / it.str.length)
     }
   let charWidth = median(widths) || 7.2
   const lines: LayoutTextLine[] = []
 
   // The script body is set in one font; web-page chrome and browser headers use others.
   // Drop those fragments before building lines, since they can share a line's height.
+  // Text in Indian scripts is always kept: it is set in its own fonts next to Courier.
   const famChars = new Map<string, number>()
-  for (const p of pages) for (const it of p.items) famChars.set(fontFamily(it.font), (famChars.get(fontFamily(it.font)) ?? 0) + it.str.trim().length)
+  for (const p of pages)
+    for (const it of p.items) if (courierLike(it)) famChars.set(fontFamily(it.font), (famChars.get(fontFamily(it.font)) ?? 0) + it.str.trim().length)
   const total = [...famChars.values()].reduce((a, b) => a + b, 0)
   const [dominant, share] = [...famChars.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0]
-  const keep = (it: PdfItem) => it.str.trim() !== '' && (share / Math.max(1, total) < 0.6 || fontFamily(it.font) === dominant)
+  const keep = (it: PdfItem) =>
+    it.str.trim() !== '' && (!courierLike(it) || share / Math.max(1, total) < 0.6 || fontFamily(it.font) === dominant)
   const bodyWidths: number[] = []
-  for (const p of pages) for (const it of p.items) if (keep(it) && it.str.trim().length >= 3 && it.width > 0) bodyWidths.push(it.width / it.str.length)
+  for (const p of pages)
+    for (const it of p.items) if (keep(it) && courierLike(it) && it.str.trim().length >= 3 && it.width > 0) bodyWidths.push(it.width / it.str.length)
   charWidth = median(bodyWidths) || charWidth
 
   pages.forEach((page, pageIndex) => {
@@ -218,8 +225,23 @@ function hasLower(t: string): boolean {
   return /\p{Ll}/u.test(t)
 }
 
+/** Letters of scripts without capitals (Tamil, Devanagari…), where any line could be a cue. */
+function hasCaseless(t: string): boolean {
+  return /\p{Lo}/u.test(t)
+}
+
+/** Written in capitals, as cues and headings are (text in scripts without capitals counts too). */
 function isUpper(t: string): boolean {
-  return /\p{Lu}/u.test(t) && !hasLower(t)
+  return /[\p{Lu}\p{Lo}]/u.test(t) && !hasLower(t)
+}
+
+function hasCased(t: string): boolean {
+  return /[\p{Lu}\p{Ll}]/u.test(t)
+}
+
+/** Reads like speech or action rather than a cue or heading. */
+function isProse(t: string): boolean {
+  return hasLower(t) || hasCaseless(t)
 }
 
 function isCueText(t: string): boolean {
@@ -376,11 +398,12 @@ export function classifyLayout(raw: LayoutTextLine[], charWidth: number, pageHei
   if (!raw.length) return { titlePage: {}, elements: [] }
 
   // The script body is set in one font; web-page chrome and browser headers use others.
+  // Lines in Indian scripts are set in their own fonts and always kept.
   const famChars = new Map<string, number>()
-  for (const l of raw) famChars.set(l.family, (famChars.get(l.family) ?? 0) + l.text.length)
+  for (const l of raw) if (!hasIndic(l.text)) famChars.set(l.family, (famChars.get(l.family) ?? 0) + l.text.length)
   const total = [...famChars.values()].reduce((a, b) => a + b, 0)
-  const [dominant, share] = [...famChars.entries()].sort((a, b) => b[1] - a[1])[0]
-  let lines = share / total >= 0.6 ? raw.filter((l) => l.family === dominant) : raw
+  const [dominant, share] = [...famChars.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0]
+  let lines = total && share / total >= 0.6 ? raw.filter((l) => hasIndic(l.text) || l.family === dominant) : raw
   lines = stripFurniture(lines, pageHeights)
   if (!lines.length) return { titlePage: {}, elements: [] }
 
@@ -451,6 +474,8 @@ export function classifyLayout(raw: LayoutTextLine[], charWidth: number, pageHei
   let prevHyphen = false
   let openParen = false
   let dialogueCol = -1
+  /** Column of the current speech's cue. */
+  let cueCol = -1
 
   const next = (i: number) => body[i + 1]
 
@@ -495,8 +520,9 @@ export function classifyLayout(raw: LayoutTextLine[], charWidth: number, pageHei
 
     // Inside a speech: parentheticals and dialogue lines. A blank line followed by more
     // text in the same column is a new paragraph of the same speech.
-    const cueAhead = isCueText(t) && next(i) && next(i).col >= 5 && next(i).gap < 1.6
-    const newParagraph = b.gap >= 1.6 && b.gap < 2.6 && Math.abs(b.col - dialogueCol) <= 2 && hasLower(t) && last()?.type === 'dialogue'
+    // Without capitals to go by (Tamil, Hindi…), a new cue inside a speech is told by its indent.
+    const cueAhead = isCueText(t) && (hasCased(t) || Math.abs(b.col - cueCol) <= 3) && next(i) && next(i).col >= 5 && next(i).gap < 1.6
+    const newParagraph = b.gap >= 1.6 && b.gap < 2.6 && Math.abs(b.col - dialogueCol) <= 2 && isProse(t) && last()?.type === 'dialogue'
     if (state === 'dialogue' && b.col >= 5 && (b.gap < 1.6 || newParagraph) && !cueAhead) {
       if (newParagraph) {
         append(last(), t, '\n')
@@ -529,7 +555,7 @@ export function classifyLayout(raw: LayoutTextLine[], charWidth: number, pageHei
 
     // Character cue: capitals, indented, followed by an indented line of speech.
     const n = next(i)
-    if (b.col >= 8 && isCueText(t) && n && n.col >= 5 && n.gap < 1.6 && (hasLower(n.text) || n.text.startsWith('('))) {
+    if (b.col >= 8 && isCueText(t) && n && n.col >= 5 && n.gap < 1.6 && (isProse(n.text) || n.text.startsWith('('))) {
       const cue = cleanCue(t)
       const name = characterName(cue)
       const l = last()
@@ -537,6 +563,7 @@ export function classifyLayout(raw: LayoutTextLine[], charWidth: number, pageHei
       state = 'dialogue'
       if (!continuing) push({ type: 'character', runs: [{ text: cue }] })
       speaker = name
+      cueCol = b.col
       continue
     }
     state = 'none'

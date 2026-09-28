@@ -24,9 +24,12 @@ import { useEffect, type ComponentType } from 'react'
 import { ELEMENTS } from '../core/elements'
 import { toFdx } from '../core/fdx'
 import { toFountain } from '../core/fountain'
-import { exportPdf, pdfUnsupportedCharacters } from '../core/pdf'
+import { exportPdf, pdfScripts } from '../core/pdf'
 import { projectTitle, safeFileName, serializeProject } from '../core/project'
+import { SCRIPTS } from '../core/scripts'
+import type { Shaper } from '../core/shaper'
 import { useApp, type ViewId } from '../store/app'
+import { loadShaper } from '../store/fonts'
 import { useAnalysis, useEditorState, usePagination, useProject } from '../store/hooks'
 import { BeatsView } from '../views/BeatsView'
 import { CardsView } from '../views/CardsView'
@@ -66,15 +69,30 @@ export async function exportAs(kind: 'pdf' | 'fountain' | 'fdx' | 'json') {
   const base = safeFileName(projectTitle(data))
   try {
     if (kind === 'pdf') {
-      const blob = await exportPdf(data.script, { settings: data.settings, titlePage: data.titlePage })
+      // Text in Indian scripts needs its fonts and the shaping engine, loaded only when used.
+      const scripts = pdfScripts(data.script, data.settings.includeTitlePage ? data.titlePage : undefined)
+      let shaper: Shaper | null = null
+      let fontError = false
+      if (scripts.size) {
+        try {
+          shaper = await loadShaper(scripts)
+        } catch (e) {
+          console.error(e)
+          fontError = true
+        }
+      }
+      const { blob, missing } = await exportPdf(data.script, { settings: data.settings, titlePage: data.titlePage, shaper })
       const saved = await saveFile(`${base}.pdf`, blob, 'application/pdf')
-      const missing = pdfUnsupportedCharacters(data.script, data.settings.includeTitlePage ? data.titlePage : undefined)
-      if (saved && missing.length) {
+      if (saved && fontError) {
+        const names = [...scripts].map((k) => SCRIPTS[k].label).join(', ')
+        s.notify(`The fonts for ${names} couldn’t be loaded, so that text appears as “?” in this PDF. Check your connection and export again.`, 'error')
+      } else if (saved && missing.length) {
         const sample = missing.slice(0, 6).join(' ')
         s.notify(
-          `The PDF’s Courier font can’t show some characters in this script (${sample}${missing.length > 6 ? ' …' : ''}), so they appear as “?”. ` +
+          `The PDF can’t show some characters in this script (${sample}${missing.length > 6 ? ' …' : ''}), so they appear as “?”. ` +
+            'It can show Latin-alphabet text, Hindi, Tamil, Telugu, Kannada and Malayalam. ' +
             (canPrint()
-              ? 'To keep them, open Preview, choose Print and save as PDF.'
+              ? 'To keep the other characters, open Preview, choose Print and save as PDF.'
               : 'Fountain and Final Draft exports keep every character.'),
           'error',
         )

@@ -181,7 +181,7 @@ function escapeRegExp(s: string): string {
 /** Ids of scenes whose action lines mention `name` (as a whole word, any case). */
 export function scenesMentioning(elements: ScriptElement[], scenes: SceneInfo[], name: string): string[] {
   if (!name) return []
-  const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(name)}(?=$|[^\\p{L}\\p{N}])`, 'iu')
+  const re = new RegExp(`(^|[^\\p{L}\\p{M}\\p{N}])${escapeRegExp(name)}(?=$|[^\\p{L}\\p{M}\\p{N}])`, 'iu')
   const out: string[] = []
   for (const s of scenes) {
     for (let i = s.index + 1; i < s.end; i++) {
@@ -201,7 +201,7 @@ export function scenesMentioning(elements: ScriptElement[], scenes: SceneInfo[],
  */
 export function renameCharacterText(text: string, from: string, to: string): string {
   if (!from) return text
-  const re = new RegExp(`(^|[^\\p{L}\\p{N}])(${escapeRegExp(from)})(?=$|[^\\p{L}\\p{N}])`, 'giu')
+  const re = new RegExp(`(^|[^\\p{L}\\p{M}\\p{N}])(${escapeRegExp(from)})(?=$|[^\\p{L}\\p{M}\\p{N}])`, 'giu')
   return text.replace(re, (_m, pre: string, word: string) => {
     let rep = to
     if (word === word.toUpperCase() && word !== word.toLowerCase()) rep = to.toUpperCase()

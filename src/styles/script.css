@@ -344,46 +344,31 @@
 }
 
 .sheet {
-  --cw: calc(var(--sheet-scale, 1) * 7.2pt);
-  --lhs: calc(var(--sheet-scale, 1) * 12pt);
+  display: block;
   width: calc(var(--sheet-scale, 1) * 8.5in);
   height: calc(var(--sheet-scale, 1) * 11in);
   background: #fff;
   color: #111;
   box-shadow: var(--paper-shadow);
-  position: relative;
-  font-family: 'Courier Prime', 'Courier New', Courier, monospace;
-  font-size: calc(var(--sheet-scale, 1) * 12pt);
-  /* Courier Prime advances 0.625em; PDF Courier advances 0.6em (7.2pt at 12pt). */
-  letter-spacing: calc(var(--sheet-scale, 1) * -0.3pt);
-  line-height: var(--lhs);
   flex: none;
   overflow: hidden;
 }
 
-.sheet-line {
-  position: absolute;
+/* Sizes are in points: the sheet's viewBox is 612 x 792. */
+.sheet text {
+  font-family: var(--font-script);
+  font-size: 12px;
+  fill: currentColor;
   white-space: pre;
-  height: var(--lhs);
 }
 
-.sheet-number {
-  position: absolute;
-  top: calc(var(--sheet-scale, 1) * 0.5in);
-  right: calc(var(--sheet-scale, 1) * 1in);
+.sheet .sheet-indic {
+  font-size: 11.52px;
 }
 
-.sheet .scene-num {
-  position: absolute;
-  color: #111;
-}
-
-.sheet-title {
-  position: absolute;
-  left: 0;
-  right: 0;
-  text-align: center;
-  white-space: pre;
+.sheet line {
+  stroke: currentColor;
+  stroke-width: 0.6;
 }
 
 @media print {

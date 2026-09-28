@@ -4,6 +4,7 @@ import type { TitlePage } from '../core/types'
 import { recordSheets, Sheet } from '../components/Sheets'
 import { LazyInput, LazyTextarea } from '../components/ui'
 import { useApp } from '../store/app'
+import { useScriptFontsVersion } from '../store/fonts'
 import { useProject } from '../store/hooks'
 
 const CREDITS = ['Written by', 'Screenplay by', 'Teleplay by', 'Story by', 'Created by', 'by']
@@ -13,7 +14,8 @@ export function TitlePageView() {
   const { updateProject, updateSettings } = useApp.getState()
   const tp = project.titlePage
   const set = (patch: Partial<TitlePage>) => updateProject((p) => ({ titlePage: { ...p.titlePage, ...patch } }))
-  const sheet = useMemo(() => recordSheets((s) => drawTitlePage(s, tp))[0], [tp])
+  const fontsVersion = useScriptFontsVersion()
+  const sheet = useMemo(() => recordSheets((s) => drawTitlePage(s, tp))[0], [tp, fontsVersion])
 
   return (
     <div className="view-scroll">

@@ -5,17 +5,28 @@ import { SAMPLE_FOUNTAIN } from './sample'
 import { DEFAULT_SETTINGS, emptyTitlePage } from './types'
 
 function recorder() {
-  const calls: { text: string; x: number; y: number; page: number }[] = []
+  const calls: { text: string; x: number; y: number; page: number; script: string | null }[] = []
   let page = 1
   const surface: PdfSurface = {
-    setFont: () => {},
-    text: (text, x, y) => calls.push({ text, x, y, page }),
+    text: (span) => {
+      calls.push({ text: span.text, x: span.x, y: span.y, page, script: span.script })
+    },
     line: () => {},
     addPage: () => {
       page++
     },
   }
   return { calls, surface, pages: () => page }
+}
+
+/** Text of each printed line: the spans on one baseline, joined. */
+function lineTexts(calls: ReturnType<typeof recorder>['calls']): string[] {
+  const lines = new Map<string, string>()
+  for (const c of [...calls].sort((a, b) => a.page - b.page || a.y - b.y || a.x - b.x)) {
+    const key = `${c.page}:${c.y}`
+    lines.set(key, (lines.get(key) ?? '') + c.text)
+  }
+  return [...lines.values()]
 }
 
 describe('pdf layout', () => {
@@ -55,14 +66,32 @@ describe('pdf layout', () => {
     expect(pdf.calls.map((c) => c.text)).toContain('INT. CAFÉ - NIGHT')
     const preview = recorder()
     drawScript(preview.surface, els, { settings: { ...DEFAULT_SETTINGS, includeTitlePage: false } })
-    expect(preview.calls.map((c) => c.text)).toContain('வாலி smiles. Łukasz waves.')
+    expect(lineTexts(preview.calls)).toContain('வாலி smiles. Łukasz waves.')
     expect(pdfUnsupportedCharacters(els)).toEqual(['வா', 'லி'])
     expect(pdfUnsupportedCharacters(elements, tp)).toEqual([])
   })
 
-  it('produces a PDF blob with jsPDF', async () => {
-    const blob = await exportPdf(elements, { settings: DEFAULT_SETTINGS, titlePage: tp })
+  it('keeps Indian scripts when the PDF has fonts for them, as separate runs', () => {
+    const els = parseFountain('INT. CAFÉ - NIGHT\n\nவாலி smiles at నాని.\n').elements
+    const pdf = recorder()
+    drawScript(pdf.surface, els, { settings: { ...DEFAULT_SETTINGS, includeTitlePage: false }, charset: 'pdf', keepIndic: true })
+    const action = pdf.calls.filter((c) => c.y === pdf.calls.find((d) => d.text === 'வாலி')!.y)
+    expect(action.map((c) => [c.text, c.script])).toEqual([
+      ['வாலி', 'tamil'],
+      [' smiles at ', null],
+      ['నాని', 'telugu'],
+      ['.', null],
+    ])
+    // Runs follow each other without gaps.
+    expect(action[1].x).toBeGreaterThan(action[0].x)
+    expect(action[2].x).toBeCloseTo(action[1].x + ' smiles at '.length * 7.2)
+    expect(pdfUnsupportedCharacters(els, undefined, true)).toEqual([])
+  })
+
+  it('produces a PDF file', async () => {
+    const { blob, missing } = await exportPdf(elements, { settings: DEFAULT_SETTINGS, titlePage: tp })
     const head = new TextDecoder().decode(new Uint8Array(await blob.arrayBuffer()).slice(0, 5))
     expect(head).toBe('%PDF-')
+    expect(missing).toEqual([])
   })
 })
