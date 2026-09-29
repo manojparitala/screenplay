@@ -1,5 +1,5 @@
 import { FileText, GripVertical, Palette, Plus, Trash, Users } from 'lucide-react'
-import { useState, type DragEvent } from 'react'
+import { useRef, useState, type DragEvent } from 'react'
 import type { SceneInfo } from '../core/analysis'
 import { formatEighths, toEighths } from '../core/paginate'
 import { SCENE_COLORS, type SceneColor } from '../core/types'
@@ -17,6 +17,9 @@ export function CardsView() {
   const setView = useApp((s) => s.setView)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropBefore, setDropBefore] = useState<number | 'end' | null>(null)
+  // The card being dragged, read by the drag events themselves: state may not have
+  // re-rendered yet when a quick drag's next event arrives. State only draws the highlight.
+  const dragging = useRef<string | null>(null)
   const [size, setSize] = useState<Size>('medium')
   const [colorFilter, setColorFilter] = useState<SceneColor | 'all'>('all')
   const [confirm, setConfirm] = useState<SceneInfo | null>(null)
@@ -35,18 +38,30 @@ export function CardsView() {
     setTimeout(() => c.revealScene(id), 0)
   }
 
-  const onDragOver = (e: DragEvent, target: number | 'end') => {
-    if (!dragId) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    if (dropBefore !== target) setDropBefore(target)
+  const startDrag = (id: string) => {
+    dragging.current = id
+    setDragId(id)
   }
 
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault()
-    if (dragId && dropBefore !== null) c.moveScene(dragId, dropBefore === 'end' ? null : dropBefore)
+  const endDrag = () => {
+    dragging.current = null
     setDragId(null)
     setDropBefore(null)
+  }
+
+  const onDragOver = (e: DragEvent, target: number | 'end') => {
+    if (!dragging.current) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropBefore(target)
+  }
+
+  /** Drop the dragged card before the card, divider or end marker it was dropped on. */
+  const onDrop = (e: DragEvent, target: number | 'end') => {
+    e.preventDefault()
+    const id = dragging.current
+    endDrag()
+    if (id) c.moveScene(id, target === 'end' ? null : target)
   }
 
   // Interleave act/sequence dividers with the scene cards.
@@ -99,13 +114,10 @@ export function CardsView() {
             </button>
           </div>
         ) : (
-          <div className="cards-grid" style={{ ['--card-min' as string]: SIZES[size] }} onDragEnd={() => {
-            setDragId(null)
-            setDropBefore(null)
-          }}>
+          <div className="cards-grid" style={{ ['--card-min' as string]: SIZES[size] }} onDragEnd={endDrag}>
             {items.map((it) =>
               it.kind === 'section' ? (
-                <div key={`sec-${it.index}`} className="cards-section" onDragOver={(e) => onDragOver(e, it.index)} onDrop={onDrop}>
+                <div key={`sec-${it.index}`} className="cards-section" onDragOver={(e) => onDragOver(e, it.index)} onDrop={(e) => onDrop(e, it.index)}>
                   {it.title || 'Section'}
                 </div>
               ) : (
@@ -114,7 +126,7 @@ export function CardsView() {
                   className={`index-card${dragId === it.scene.id ? ' dragging' : ''}${dropBefore === it.scene.index && dragId !== it.scene.id ? ' drop-before' : ''}`}
                   style={{ ['--dot' as string]: colorVar(it.scene.color) }}
                   onDragOver={(e) => onDragOver(e, it.scene.index)}
-                  onDrop={onDrop}
+                  onDrop={(e) => onDrop(e, it.scene.index)}
                   aria-label={`Scene ${it.scene.number}`}
                 >
                   <div className="index-card-head">
@@ -122,7 +134,7 @@ export function CardsView() {
                       className="grip"
                       draggable={!filtering}
                       onDragStart={(e) => {
-                        setDragId(it.scene.id)
+                        startDrag(it.scene.id)
                         e.dataTransfer.effectAllowed = 'move'
                         e.dataTransfer.setData('text/plain', it.scene.heading)
                         const card = (e.currentTarget as HTMLElement).closest('.index-card')
@@ -199,7 +211,7 @@ export function CardsView() {
                 className={`add-card${dropBefore === 'end' ? ' drop-before' : ''}`}
                 onClick={() => c.insertScene(null, 'INT. ')}
                 onDragOver={(e) => onDragOver(e, 'end')}
-                onDrop={onDrop}
+                onDrop={(e) => onDrop(e, 'end')}
               >
                 <Plus size={18} /> {dragId ? 'Move to end' : 'Add scene'}
               </button>

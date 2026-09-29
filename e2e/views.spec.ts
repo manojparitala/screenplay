@@ -47,6 +47,31 @@ test('dragging an index card reorders the script, and undo restores it', async (
   expect(await headings(page)).toEqual(before)
 })
 
+test('a quick drag moves the card even before the page redraws', async ({ page }) => {
+  await openSample(page)
+  const before = await headings(page)
+  await page.getByRole('button', { name: 'Cards', exact: true }).click()
+  await expect(page.locator('.index-card')).toHaveCount(6)
+  // Every drag event at once, with no time to redraw in between.
+  await page.evaluate(() => {
+    const cards = document.querySelectorAll('.index-card')
+    const grip = cards[2].querySelector('.grip')!
+    const data = new DataTransfer()
+    const fire = (target: Element, type: string) => {
+      const event = new DragEvent(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'dataTransfer', { value: data })
+      target.dispatchEvent(event)
+    }
+    fire(grip, 'dragstart')
+    fire(cards[0], 'dragenter')
+    fire(cards[0], 'dragover')
+    fire(cards[0], 'drop')
+    fire(grip, 'dragend')
+  })
+  await page.getByRole('button', { name: 'Script', exact: true }).click()
+  expect((await headings(page))[0]).toBe(before[2])
+})
+
 test('renaming a character updates cues and action lines', async ({ page }) => {
   await openSample(page)
   await page.getByRole('button', { name: 'Characters', exact: true }).click()
