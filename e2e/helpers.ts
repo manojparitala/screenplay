@@ -8,8 +8,10 @@ export async function paste(page: Page, text: string) {
   await page.evaluate((t) => {
     const data = new DataTransfer()
     data.setData('text/plain', t)
-    const target = document.activeElement ?? document.body
-    target.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true })
+    // Firefox ignores clipboardData given to the constructor, so attach it to the event instead.
+    Object.defineProperty(event, 'clipboardData', { value: data })
+    ;(document.activeElement ?? document.body).dispatchEvent(event)
   }, text)
 }
 
@@ -19,9 +21,7 @@ export async function paste(page: Page, text: string) {
  */
 export function watchPage(page: Page) {
   const problems: string[] = []
-  page.on('console', (m) => {
-    if (m.type() === 'error' || m.type() === 'warning') problems.push(`${m.type()}: ${m.text()}`)
-  })
+  page.on('console', (m) => problems.push(`${m.type()}: ${m.text()}`))
   page.on('pageerror', (e) => problems.push(`uncaught: ${e.message}`))
   return {
     async expectVisible(locator: Locator, timeout = 20_000) {

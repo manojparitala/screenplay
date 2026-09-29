@@ -623,6 +623,8 @@ export const useApp = create<AppState>((set, get) => {
     },
 
     notify(message, kind = 'info', action) {
+      // Problems also go to the console, where they outlast the message on screen.
+      if (kind === 'error') console.warn(message)
       const id = uid()
       set({ toasts: [...get().toasts, { id, message, kind, action }] })
       if (!action) setTimeout(() => get().dismissToast(id), kind === 'error' ? 9000 : 4000)

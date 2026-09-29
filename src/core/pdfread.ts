@@ -2,7 +2,10 @@ import type { PdfItem, PdfPage } from './pdfimport'
 
 /** The parts of pdf.js we use (browser and Node builds share this shape). */
 export interface PdfJsLike {
-  getDocument(src: { data: Uint8Array; verbosity?: number; isEvalSupported?: boolean }): { promise: Promise<PdfDocLike>; destroy(): Promise<void> }
+  getDocument(src: { data: Uint8Array; verbosity?: number; isEvalSupported?: boolean; disableFontFace?: boolean }): {
+    promise: Promise<PdfDocLike>
+    destroy(): Promise<void>
+  }
 }
 
 interface PdfDocLike {
@@ -28,7 +31,9 @@ interface TextItemLike {
 
 /** Extract positioned text from every page of a PDF with pdf.js. */
 export async function readPdfPages(data: Uint8Array, pdfjs: PdfJsLike, onProgress?: (page: number, total: number) => void): Promise<PdfPage[]> {
-  const task = pdfjs.getDocument({ data, verbosity: 0, isEvalSupported: false })
+  // Only the text is read, never drawn: loading the PDF's fonts into the page would be wasted
+  // work, and Safari's engine can wait on some of them forever.
+  const task = pdfjs.getDocument({ data, verbosity: 0, isEvalSupported: false, disableFontFace: true })
   const doc = await task.promise
   const pages: PdfPage[] = []
   try {
