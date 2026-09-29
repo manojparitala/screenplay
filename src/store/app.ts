@@ -312,7 +312,7 @@ export const useApp = create<AppState>((set, get) => {
     },
 
     async importFile(file) {
-      if (await isZip(file)) return get().restoreBackup(file)
+      if (await isZip(file).catch(() => false)) return get().restoreBackup(file)
       try {
         let p: Project
         if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
