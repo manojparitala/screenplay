@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 
+// Only Chrome and Edge let web pages write files on the computer; files-unsupported.spec.ts covers the rest.
+test.skip(({ browserName }) => browserName !== 'chromium', 'Saving to files needs the File System Access API')
+
 const NAME = 'Untitled Screenplay.screenplay.json'
 
 /**

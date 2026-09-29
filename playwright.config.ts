@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// Chromium by default; CI also runs Firefox and WebKit (Safari's engine): BROWSERS=firefox,webkit.
+const DEVICES = { chromium: devices['Desktop Chrome'], firefox: devices['Desktop Firefox'], webkit: devices['Desktop Safari'] }
+const browsers = (process.env.BROWSERS ?? 'chromium').split(',').map((b) => b.trim() as keyof typeof DEVICES)
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
@@ -14,7 +18,7 @@ export default defineConfig({
     // The offline cache is tested on its own (offline.spec.ts); elsewhere pages load from the server.
     serviceWorkers: 'block',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1400, height: 900 } } }],
+  projects: browsers.map((name) => ({ name, use: { ...DEVICES[name], viewport: { width: 1400, height: 900 } } })),
   webServer: {
     command: 'npm run build && npx vite preview --port 4173 --strictPort',
     url: 'http://localhost:4173',
