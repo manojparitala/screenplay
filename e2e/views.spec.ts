@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { paste, watchPage } from './helpers'
 
 async function openSample(page: Page) {
   await page.goto('/')
@@ -73,14 +74,12 @@ test('exports Fountain, Final Draft and PDF files', async ({ page }) => {
   }
 })
 
-test('shows page breaks for a long script', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+test('shows page breaks for a long script', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'New screenplay' }).first().click()
   await page.locator('.script-editor').click()
   const scene = 'INT. HALL - DAY\n\nFootsteps echo down the hall and fade.\n\nANNA\nIs anyone there? Hello?\n\n'
-  await page.evaluate((text) => navigator.clipboard.writeText(text), scene.repeat(40))
-  await page.keyboard.press('ControlOrMeta+v')
+  await paste(page, scene.repeat(40))
   await expect(page.locator('.page-break-label').first()).toBeVisible()
   await expect(page.locator('.statusbar')).toContainText(/of [5-9]/)
 })
@@ -177,6 +176,7 @@ test('relationships show who talks with whom', async ({ page }) => {
 })
 
 test('imports a screenplay PDF, such as one exported from this app', async ({ page }, testInfo) => {
+  const watch = watchPage(page)
   await openSample(page)
   await page.getByRole('button', { name: 'Export' }).click()
   const download = page.waitForEvent('download')
@@ -185,7 +185,7 @@ test('imports a screenplay PDF, such as one exported from this app', async ({ pa
   await (await download).saveAs(pdfPath)
   await page.getByRole('button', { name: 'Back to library' }).click()
   await page.getByLabel('File to import').setInputFiles(pdfPath)
-  await expect(page.locator('.script-editor')).toBeVisible({ timeout: 20000 })
+  await watch.expectVisible(page.locator('.script-editor'))
   await expect(page.locator('.project-title')).toHaveText('THE LAST LIGHTHOUSE')
   await expect(page.locator('.nav-scene')).toHaveCount(6)
   await expect(page.locator('.el-character', { hasText: /^IDA \(V\.O\.\)$/ })).toHaveCount(1)

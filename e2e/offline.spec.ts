@@ -3,6 +3,7 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { extname, join, normalize } from 'node:path'
 import { expect, test } from '@playwright/test'
+import { watchPage } from './helpers'
 
 test.use({ serviceWorkers: 'allow' })
 
@@ -47,6 +48,7 @@ async function serveApp(): Promise<{ url: string; stop: () => Promise<void> }> {
 }
 
 test('can be installed, and keeps working once the site is out of reach', async ({ page }) => {
+  const watch = watchPage(page)
   const site = await serveApp()
   await page.goto(site.url)
   // What browsers need to offer installing the app.
@@ -84,6 +86,6 @@ test('can be installed, and keeps working once the site is out of reach', async 
   await page.getByRole('button', { name: 'Back to library' }).click()
   const bytes = await (await import('node:fs/promises')).readFile(await pdf.path())
   await page.getByLabel('File to import').setInputFiles({ name: 'Offline.pdf', mimeType: 'application/pdf', buffer: bytes })
-  await expect(page.locator('.toast', { hasText: 'Imported “The Last Lighthouse”.' })).toBeVisible()
+  await watch.expectVisible(page.locator('.toast', { hasText: 'Imported “The Last Lighthouse”.' }))
   await expect(page.locator('.script-editor')).toContainText('வாலி')
 })

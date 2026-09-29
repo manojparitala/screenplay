@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { paste } from './helpers'
 
 const elements = (page: Page) =>
   page.locator('.script-editor > p.el').evaluateAll((els) =>
@@ -101,11 +102,9 @@ test('element shortcuts, undo and persistence across reloads', async ({ page }) 
   ])
 })
 
-test('pastes Fountain text as formatted elements', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+test('pastes Fountain text as formatted elements', async ({ page }) => {
   await newScript(page)
-  await page.evaluate(() => navigator.clipboard.writeText('INT. LAB - NIGHT\n\nSparks fly.\n\nDR. VOSS\n(grinning)\nIt lives!\n'))
-  await page.keyboard.press('ControlOrMeta+v')
+  await paste(page, 'INT. LAB - NIGHT\n\nSparks fly.\n\nDR. VOSS\n(grinning)\nIt lives!\n')
   expect(await elements(page)).toEqual([
     ['scene', 'INT. LAB - NIGHT'],
     ['action', 'Sparks fly.'],

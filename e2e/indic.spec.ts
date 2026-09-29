@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Page } from '@playwright/test'
+import { watchPage } from './helpers'
 
 const SCRIPT = `Title: வாலி
 Author: மணி ரத்னம்
@@ -74,6 +75,7 @@ test('writes in Tamil, Telugu, Kannada, Malayalam and Hindi with the bundled fon
 })
 
 test('exports a PDF with shaped Indian scripts that imports back', async ({ page }, testInfo) => {
+  const watch = watchPage(page)
   await importScript(page)
   await page.getByRole('button', { name: 'Export' }).click()
   const download = page.waitForEvent('download')
@@ -90,7 +92,7 @@ test('exports a PDF with shaped Indian scripts that imports back', async ({ page
 
   await page.getByRole('button', { name: 'Back to library' }).click()
   await page.getByLabel('File to import').setInputFiles(path)
-  await expect(page.locator('.script-editor')).toBeVisible({ timeout: 20000 })
+  await watch.expectVisible(page.locator('.script-editor'))
   await expect(page.locator('.project-title')).toHaveText('வாலி')
   await expect(page.locator('.nav-scene .heading')).toHaveText(['INT. வீடு - இரவு', 'INT. ఇల్లు - రాత్రి', 'EXT. ಮನೆ - ಹಗಲು', 'EXT. വീട് - പകൽ', 'INT. कमरा - रात'])
   await expect(page.locator('.el-character')).toHaveText(['வாலி', 'MAYA'])
