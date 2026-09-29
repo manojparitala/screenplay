@@ -28,6 +28,13 @@
   position: relative;
 }
 
+/* A4 is 0.23in narrower and 0.69in taller; the text column stays put, so the right margin shrinks. */
+.paper.paper-a4 {
+  width: 82.68ch;
+  min-height: 116.93ch;
+  padding-right: 7.68ch;
+}
+
 .script-editor {
   outline: none;
   white-space: pre-wrap;
@@ -343,10 +350,9 @@
   padding: 24px 16px 80px;
 }
 
+/* Width and height are set per paper size by the Sheet component. */
 .sheet {
   display: block;
-  width: calc(var(--sheet-scale, 1) * 8.5in);
-  height: calc(var(--sheet-scale, 1) * 11in);
   background: #fff;
   color: #111;
   box-shadow: var(--paper-shadow);

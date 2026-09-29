@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { drawTitlePage } from '../core/pdf'
+import { drawTitlePage, pageSize } from '../core/pdf'
 import type { TitlePage } from '../core/types'
 import { recordSheets, Sheet } from '../components/Sheets'
 import { LazyInput, LazyTextarea } from '../components/ui'
@@ -15,7 +15,11 @@ export function TitlePageView() {
   const tp = project.titlePage
   const set = (patch: Partial<TitlePage>) => updateProject((p) => ({ titlePage: { ...p.titlePage, ...patch } }))
   const fontsVersion = useScriptFontsVersion()
-  const sheet = useMemo(() => recordSheets((s) => drawTitlePage(s, tp))[0], [tp, fontsVersion])
+  const paper = project.settings.paper
+  const sheet = useMemo(() => {
+    const size = pageSize({ paper })
+    return recordSheets((s) => drawTitlePage(s, tp, undefined, undefined, size), size)[0]
+  }, [tp, paper, fontsVersion])
 
   return (
     <div className="view-scroll">

@@ -1,4 +1,4 @@
-import { ELEMENTS, PAGE } from './elements'
+import { ELEMENTS, PAGE, paperOf } from './elements'
 import { paginate, type LayoutLine, type Pagination } from './paginate'
 import { EmbeddedFont, PdfWriter, type Style } from './pdfwriter'
 import { currentEmMeasure, hasIndic, INDIC_EM_CELLS, lineHeightOf, scriptsIn, segmentScripts, textCells, type EmMeasure, type IndicScript } from './scripts'
@@ -13,7 +13,8 @@ const CW = PT / PAGE.cpi // character width in points (7.2)
 const LH = PT / PAGE.lpi // line height in points (12)
 const LEFT = PAGE.leftIn * PT
 const TOP = PAGE.topIn * PT
-const RIGHT_EDGE = (PAGE.widthIn - 1) * PT
+/** Right edge of the 6in text column (1in from the edge of US Letter), on every paper size. */
+const TEXT_RIGHT = LEFT + 60 * CW
 /** Baseline of a line's text, below the top of the line. */
 const BASELINE = 10.2
 /** Size of text in the Indic scripts: 1.6 Courier cells per em. */
@@ -60,6 +61,12 @@ function cleaner(charset: PrintOptions['charset'], keepIndic = false): Clean {
   return charset === 'pdf' ? (t) => toPdfCharset(asciiSafe(t), keepIndic).text : asciiSafe
 }
 
+/** Page size in points for the script's paper. */
+export function pageSize(settings: Pick<ScriptSettings, 'paper'>): { width: number; height: number } {
+  const p = paperOf(settings)
+  return { width: p.widthIn * PT, height: p.heightIn * PT }
+}
+
 /** Prepare elements for printing and lay them out. */
 export function paginateForPrint(
   elements: ScriptElement[],
@@ -70,28 +77,34 @@ export function paginateForPrint(
 ): Pagination {
   const clean = cleaner(charset, keepIndic)
   const safe = elements.map((el) => ({ ...el, runs: mapRunsText(el.runs, clean) }))
-  return paginate(safe, { sceneSpacing: settings.sceneSpacing, autoContd: settings.autoContd, measure })
+  return paginate(safe, { sceneSpacing: settings.sceneSpacing, autoContd: settings.autoContd, linesPerPage: paperOf(settings).linesPerPage, measure })
 }
 
 function titlePageTexts(tp: TitlePage): string[] {
   return [tp.title, tp.credit, tp.author, tp.source, tp.contact, tp.draftDate, tp.copyright]
 }
 
-function printedTexts(elements: ScriptElement[], titlePage?: TitlePage): string[] {
+function printedTexts(elements: ScriptElement[], titlePage?: TitlePage, settings?: Pick<ScriptSettings, 'header' | 'footer'>): string[] {
   const texts = elements.filter((e) => ELEMENTS[e.type].printable).flatMap((e) => e.runs.map((r) => r.text))
   if (titlePage) texts.push(...titlePageTexts(titlePage))
+  if (settings) texts.push(settings.header ?? '', settings.footer ?? '')
   return texts
 }
 
-/** Indic scripts a PDF of this script needs fonts for. */
-export function pdfScripts(elements: ScriptElement[], titlePage?: TitlePage): Set<IndicScript> {
-  return scriptsIn(printedTexts(elements, titlePage))
+/** Indic scripts a PDF of this script needs fonts for (including its header and footer). */
+export function pdfScripts(elements: ScriptElement[], titlePage?: TitlePage, settings?: Pick<ScriptSettings, 'header' | 'footer'>): Set<IndicScript> {
+  return scriptsIn(printedTexts(elements, titlePage, settings))
 }
 
 /** Characters a downloaded PDF can't show (they print as "?"), in order of first use. */
-export function pdfUnsupportedCharacters(elements: ScriptElement[], titlePage?: TitlePage, keepIndic = false): string[] {
+export function pdfUnsupportedCharacters(
+  elements: ScriptElement[],
+  titlePage?: TitlePage,
+  keepIndic = false,
+  settings?: Pick<ScriptSettings, 'header' | 'footer'>,
+): string[] {
   const seen = new Set<string>()
-  for (const t of printedTexts(elements, titlePage)) for (const ch of toPdfCharset(asciiSafe(t), keepIndic).missing) seen.add(ch)
+  for (const t of printedTexts(elements, titlePage, settings)) for (const ch of toPdfCharset(asciiSafe(t), keepIndic).missing) seen.add(ch)
   return [...seen]
 }
 
@@ -141,11 +154,17 @@ export function hasTitlePage(tp?: TitlePage): tp is TitlePage {
   return !!tp && !!(tp.title.trim() || tp.author.trim())
 }
 
-export function drawTitlePage(s: PdfSurface, tp: TitlePage, clean: Clean = asciiSafe, measure?: EmMeasure) {
+export function drawTitlePage(
+  s: PdfSurface,
+  tp: TitlePage,
+  clean: Clean = asciiSafe,
+  measure?: EmMeasure,
+  size = pageSize({ paper: 'letter' }),
+) {
   const width = (text: string) => textCells(text, measure) * CW
   let top = 3.5 * PT
   const centered = (text: string) => {
-    drawText(s, text, (PAGE.widthIn * PT - width(text)) / 2, top + BASELINE, 'normal', measure)
+    drawText(s, text, (size.width - width(text)) / 2, top + BASELINE, 'normal', measure)
     top += LH * lineHeightOf(text)
   }
   for (const l of clean(tp.title.toUpperCase()).split('\n')) centered(l)
@@ -160,7 +179,7 @@ export function drawTitlePage(s: PdfSurface, tp: TitlePage, clean: Clean = ascii
     for (const l of clean(tp.source).split('\n')) centered(l.trim())
   }
   // Contact details bottom left, draft date and copyright bottom right, stacked up from the bottom margin.
-  const bottom = (PAGE.heightIn - 1) * PT
+  const bottom = size.height - PT
   const stack = (lines: string[], x: (l: string) => number) => {
     let t = bottom - lines.reduce((h, l) => h + LH * lineHeightOf(l), 0)
     for (const l of lines) {
@@ -176,18 +195,31 @@ export function drawTitlePage(s: PdfSurface, tp: TitlePage, clean: Clean = ascii
   )
   stack(
     [tp.draftDate, tp.copyright].map((v) => clean(v.trim())).filter(Boolean),
-    (l) => RIGHT_EDGE - width(l),
+    (l) => TEXT_RIGHT - width(l),
   )
+}
+
+/** Shorten text to at most `cells` wide, ending with "..." when cut. */
+function clip(text: string, cells: number, measure?: EmMeasure): string {
+  if (textCells(text, measure) <= cells) return text
+  let t = text
+  while (t && textCells(`${t}...`, measure) > cells) t = t.slice(0, -1).replace(/[\p{M}‌‍]+$/u, '')
+  return `${t.trimEnd()}...`
 }
 
 /** Draw the whole screenplay onto a surface. Returns the number of pages drawn. */
 export function drawScript(s: PdfSurface, elements: ScriptElement[], opts: PrintOptions): number {
   const { settings, measure } = opts
+  const size = pageSize(settings)
+  const clean = cleaner(opts.charset, opts.keepIndic)
   const pagination = paginateForPrint(elements, settings, opts.charset, opts.keepIndic, measure)
+  // The header shares its line with the page number; the footer is centred at the foot of the page.
+  const header = clip(clean((settings.header ?? '').replace(/\s+/g, ' ').trim()), 50, measure)
+  const footer = clip(clean((settings.footer ?? '').replace(/\s+/g, ' ').trim()), 60, measure)
   let first = true
   let count = 0
   if (settings.includeTitlePage && hasTitlePage(opts.titlePage)) {
-    drawTitlePage(s, opts.titlePage, cleaner(opts.charset, opts.keepIndic), measure)
+    drawTitlePage(s, opts.titlePage, clean, measure, size)
     first = false
     count++
   }
@@ -197,8 +229,10 @@ export function drawScript(s: PdfSurface, elements: ScriptElement[], opts: Print
     count++
     if (page.number > 1) {
       const num = `${page.number}.`
-      drawText(s, num, RIGHT_EDGE - num.length * CW, 0.5 * PT + BASELINE, 'normal')
+      drawText(s, num, TEXT_RIGHT - num.length * CW, 0.5 * PT + BASELINE, 'normal')
+      if (header) drawText(s, header, LEFT, 0.5 * PT + BASELINE, 'normal', measure)
     }
+    if (footer) drawText(s, footer, (size.width - textCells(footer, measure) * CW) / 2, size.height - 0.5 * PT - LH + BASELINE, 'normal', measure)
     let top = TOP
     for (const line of page.lines) {
       if (!line) {
@@ -209,7 +243,7 @@ export function drawScript(s: PdfSurface, elements: ScriptElement[], opts: Print
       if (settings.showSceneNumbers && line.sceneNumber) {
         const n = String(line.sceneNumber)
         drawText(s, n, LEFT - 0.35 * PT - n.length * CW, top + BASELINE, 'normal')
-        drawText(s, n, RIGHT_EDGE + 0.15 * PT, top + BASELINE, 'normal')
+        drawText(s, n, TEXT_RIGHT + 0.15 * PT, top + BASELINE, 'normal')
       }
       top += LH * line.height
     }
@@ -230,11 +264,14 @@ export interface PdfExport {
  */
 export async function exportPdf(elements: ScriptElement[], opts: PrintOptions & { shaper?: Shaper | null }): Promise<PdfExport> {
   const { shaper } = opts
-  const writer = new PdfWriter({
-    title: opts.titlePage?.title || 'Screenplay',
-    author: opts.titlePage?.author || '',
-    creator: 'Screenplay',
-  })
+  const writer = new PdfWriter(
+    {
+      title: opts.titlePage?.title || 'Screenplay',
+      author: opts.titlePage?.author || '',
+      creator: 'Screenplay',
+    },
+    pageSize(opts.settings),
+  )
   const fonts = new Map<IndicScript, EmbeddedFont>()
   const surface: PdfSurface = {
     text: (span) => {
@@ -256,6 +293,6 @@ export async function exportPdf(elements: ScriptElement[], opts: PrintOptions & 
   const titlePage = opts.settings.includeTitlePage ? opts.titlePage : undefined
   return {
     blob: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }),
-    missing: pdfUnsupportedCharacters(elements, titlePage, !!shaper),
+    missing: pdfUnsupportedCharacters(elements, titlePage, !!shaper, opts.settings),
   }
 }

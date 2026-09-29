@@ -93,7 +93,15 @@ export interface Note {
 
 export type EnterAfterDialogue = 'action' | 'character'
 
+/** Paper the script is laid out and printed on. */
+export type PaperSize = 'letter' | 'a4'
+
 export interface ScriptSettings {
+  paper: PaperSize
+  /** Printed at the top left of every script page after the first. */
+  header: string
+  /** Printed at the bottom of every script page. */
+  footer: string
   showSceneNumbers: boolean
   autoContd: boolean
   /** Blank lines printed before each scene heading (1 or 2). */
@@ -132,6 +140,9 @@ export interface Snapshot {
 }
 
 export const DEFAULT_SETTINGS: ScriptSettings = {
+  paper: 'letter',
+  header: '',
+  footer: '',
   showSceneNumbers: false,
   autoContd: true,
   sceneSpacing: 1,

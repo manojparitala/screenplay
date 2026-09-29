@@ -8,10 +8,36 @@ import {
   ELEMENT_TYPES,
   emptyTitlePage,
   SCENE_COLORS,
+  type PaperSize,
   type Project,
   type ScriptElement,
+  type ScriptSettings,
   type TitlePage,
 } from './types'
+
+/** Regions that print on US Letter paper; the rest of the world uses A4. */
+const LETTER_REGIONS = new Set(['US', 'CA', 'MX', 'PH', 'CL', 'CO', 'VE', 'CR', 'GT', 'PA', 'PR', 'SV', 'DO', 'NI'])
+
+/** Paper for a new script: A4, except where Letter is the norm (or the region is unknown). */
+export function defaultPaper(locale: string = typeof navigator !== 'undefined' ? navigator.language : ''): PaperSize {
+  let region: string | undefined
+  try {
+    region = new Intl.Locale(locale).maximize().region
+  } catch {
+    region = undefined
+  }
+  return !region || LETTER_REGIONS.has(region) ? 'letter' : 'a4'
+}
+
+function sanitizeSettings(raw: unknown): ScriptSettings {
+  const s = { ...DEFAULT_SETTINGS, ...(isObject(raw) ? (raw as Partial<ScriptSettings>) : {}) }
+  return {
+    ...s,
+    paper: s.paper === 'a4' ? 'a4' : 'letter',
+    header: typeof s.header === 'string' ? s.header : '',
+    footer: typeof s.footer === 'string' ? s.footer : '',
+  }
+}
 
 export function createProject(title = 'Untitled Screenplay'): Project {
   const now = Date.now()
@@ -25,7 +51,7 @@ export function createProject(title = 'Untitled Screenplay'): Project {
     locations: {},
     beats: { templateId: 'save-the-cat', entries: {} },
     notes: [],
-    settings: { ...DEFAULT_SETTINGS },
+    settings: { ...DEFAULT_SETTINGS, paper: defaultPaper() },
   }
 }
 
@@ -96,7 +122,7 @@ export function sanitizeProject(raw: unknown, keepId = true): Project {
         ? (raw.beats as unknown as Project['beats'])
         : base.beats,
     notes: Array.isArray(raw.notes) ? (raw.notes as Project['notes']) : [],
-    settings: { ...DEFAULT_SETTINGS, ...(isObject(raw.settings) ? (raw.settings as Partial<Project['settings']>) : {}) },
+    settings: sanitizeSettings(raw.settings),
     stats: isObject(raw.stats) ? (raw.stats as Project['stats']) : undefined,
   }
 }
@@ -112,6 +138,24 @@ export function detectFormat(fileName: string, text: string): ImportFormat {
   return 'fountain'
 }
 
+/**
+ * A script saved by this app (or a project backup), keeping its identity.
+ * Strict, because the file it came from will be written to: anything else
+ * throws rather than risk overwriting someone's other files.
+ */
+export function parseProjectFile(text: string): Project {
+  let data: unknown = null
+  try {
+    data = JSON.parse(text)
+  } catch {
+    /* not JSON */
+  }
+  if (!isObject(data) || data.format !== BACKUP_FORMAT || !isObject(data.project) || typeof data.project.id !== 'string') {
+    throw new Error('This file isn’t a screenplay saved by this app.')
+  }
+  return sanitizeProject(data.project, true)
+}
+
 /** Build a new project from an imported file. */
 export function projectFromFile(fileName: string, text: string): Project {
   const format = detectFormat(fileName, text)
@@ -123,6 +167,7 @@ export function projectFromFile(fileName: string, text: string): Project {
       throw new Error('This JSON file could not be read.')
     }
     const raw = isObject(data) && data.format === BACKUP_FORMAT ? data.project : data
+    if (!isObject(raw) || !Array.isArray(raw.script)) throw new Error('This JSON file isn’t a screenplay backup.')
     const p = sanitizeProject(raw, false)
     p.createdAt = Date.now()
     p.updatedAt = Date.now()

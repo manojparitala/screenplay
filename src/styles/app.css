@@ -339,6 +339,30 @@ kbd {
   color: var(--danger);
 }
 
+.file-btn {
+  max-width: 220px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.file-btn.active {
+  background: var(--surface-3);
+}
+
+.file-btn.problem {
+  color: var(--danger);
+}
+
+.file-btn svg {
+  flex: none;
+}
+
+.file-btn .file-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .workspace {
   flex: 1;
   min-height: 0;
@@ -1987,7 +2011,8 @@ table.data tr.clickable {
   }
 
   .brand-name,
-  .save-state {
+  .save-state,
+  .file-btn .file-label {
     display: none;
   }
 }

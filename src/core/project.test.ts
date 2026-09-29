@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { toFdx } from './fdx'
-import { createProject, detectFormat, projectFromFile, safeFileName, sanitizeProject, serializeProject } from './project'
+import { createProject, defaultPaper, detectFormat, parseProjectFile, projectFromFile, safeFileName, sanitizeProject, serializeProject } from './project'
 import { SAMPLE_FOUNTAIN } from './sample'
 
 describe('project files', () => {
@@ -45,6 +45,18 @@ describe('project files', () => {
     expect(copy.id).not.toBe(original.id)
     expect(copy.titlePage.title).toBe('Backup Test')
     expect(copy.notes).toHaveLength(1)
+    expect(() => projectFromFile('package.json', '{"name":"my-app","version":"1.0.0"}')).toThrow('isn’t a screenplay backup')
+  })
+
+  it('opens its own script files keeping their identity, and nothing else', () => {
+    const original = createProject('Saved Script')
+    const opened = parseProjectFile(serializeProject(original))
+    expect(opened.id).toBe(original.id)
+    expect(opened.updatedAt).toBe(original.updatedAt)
+    expect(opened.titlePage.title).toBe('Saved Script')
+    // Other files must never be taken for scripts: the app writes back to the files it opens.
+    const notOurs = ['{}', '{"name":"my-app","version":"1.0.0"}', JSON.stringify(original), '{"format":"screenplay-project","project":{}}', 'Title: X\n\nINT. HOUSE - DAY', '']
+    for (const text of notOurs) expect(() => parseProjectFile(text)).toThrow('isn’t a screenplay saved by this app')
   })
 
   it('sanitizes malformed data', () => {
@@ -53,6 +65,28 @@ describe('project files', () => {
     expect(p.settings.autoContd).toBe(false)
     expect(p.settings.sceneSpacing).toBe(1)
     expect(() => sanitizeProject('nope')).toThrow()
+  })
+})
+
+describe('paper', () => {
+  it('starts new scripts on the paper of the writer’s region', () => {
+    expect(defaultPaper('en-US')).toBe('letter')
+    expect(defaultPaper('en-CA')).toBe('letter')
+    expect(defaultPaper('te-IN')).toBe('a4')
+    expect(defaultPaper('en-IN')).toBe('a4')
+    expect(defaultPaper('en-GB')).toBe('a4')
+    expect(defaultPaper('de')).toBe('a4')
+    // "en" alone is taken as the United States; unreadable locales fall back to Letter.
+    expect(defaultPaper('en')).toBe('letter')
+    expect(defaultPaper('')).toBe('letter')
+  })
+
+  it('keeps older scripts on US Letter and cleans up stored settings', () => {
+    const old = { ...createProject(), settings: { autoContd: false } }
+    expect(sanitizeProject(old).settings).toMatchObject({ paper: 'letter', header: '', footer: '', autoContd: false })
+    const odd = { ...createProject(), settings: { paper: 'tabloid', header: 42 } }
+    expect(sanitizeProject(odd).settings).toMatchObject({ paper: 'letter', header: '' })
+    expect(sanitizeProject({ ...createProject(), settings: { paper: 'a4', footer: '© Me' } }).settings).toMatchObject({ paper: 'a4', footer: '© Me' })
   })
 })
 

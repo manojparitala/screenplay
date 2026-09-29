@@ -9,8 +9,8 @@ import { blankGlyph, glyphPath, parseTrueType, subsetTrueType, type TrueTypeFont
 
 export type Style = 'normal' | 'bold' | 'italic' | 'bolditalic'
 
-const PAGE_WIDTH = 612
-const PAGE_HEIGHT = 792
+/** US Letter, in points. */
+const LETTER = { width: 612, height: 792 }
 
 const COURIER: Record<Style, { name: string; resource: string }> = {
   normal: { name: 'Courier', resource: 'F1' },
@@ -146,9 +146,14 @@ export class PdfWriter {
   private pages: string[][] = []
   private fonts: EmbeddedFont[] = []
   private info: PdfInfo
+  /** Page size in points. */
+  readonly width: number
+  readonly height: number
 
-  constructor(info: PdfInfo = {}) {
+  constructor(info: PdfInfo = {}, size: { width: number; height: number } = LETTER) {
     this.info = info
+    this.width = size.width
+    this.height = size.height
   }
 
   get pageCount(): number {
@@ -167,7 +172,7 @@ export class PdfWriter {
   /** Text in standard Courier, with its baseline at y. */
   courier(text: string, x: number, y: number, size: number, style: Style = 'normal') {
     if (!text) return
-    this.ops.push(`BT /${COURIER[style].resource} ${num(size)} Tf 1 0 0 1 ${num(x)} ${num(PAGE_HEIGHT - y)} Tm ${winAnsiLiteral(text)} Tj ET`)
+    this.ops.push(`BT /${COURIER[style].resource} ${num(size)} Tf 1 0 0 1 ${num(x)} ${num(this.height - y)} Tm ${winAnsiLiteral(text)} Tj ET`)
   }
 
   embed(data: Uint8Array): EmbeddedFont {
@@ -208,7 +213,7 @@ export class PdfWriter {
     const ops = this.ops
     ops.push('q BT', `/${font.resource} ${num(size)} Tf`)
     if (bold) ops.push(`2 Tr ${num(size / 30)} w`)
-    ops.push(`1 0 ${skew} 1 ${num(x + (at(carriers[0]) * size) / 1000)} ${num(PAGE_HEIGHT - y)} Tm`)
+    ops.push(`1 0 ${skew} 1 ${num(x + (at(carriers[0]) * size) / 1000)} ${num(this.height - y)} Tm`)
     let parts = ''
     let rise = 0
     carriers.forEach((i, k) => {
@@ -237,7 +242,7 @@ export class PdfWriter {
         if (i === carriers[k]) continue
         const g = run[i]
         const gx = x + (pens[i] + g.dx) * scale
-        const gy = PAGE_HEIGHT - y + g.dy * scale
+        const gy = this.height - y + g.dy * scale
         ops.push(`q ${num(scale)} 0 ${num(skew * scale)} ${num(scale)} ${num(gx)} ${num(gy)} cm /${font.shape(g.gid, bold)} Do Q`)
       }
     })
@@ -245,7 +250,7 @@ export class PdfWriter {
   }
 
   line(x1: number, y1: number, x2: number, y2: number, width = 0.6) {
-    this.ops.push(`${num(width)} w ${num(x1)} ${num(PAGE_HEIGHT - y1)} m ${num(x2)} ${num(PAGE_HEIGHT - y2)} l S`)
+    this.ops.push(`${num(width)} w ${num(x1)} ${num(this.height - y1)} m ${num(x2)} ${num(this.height - y2)} l S`)
   }
 
   async output(): Promise<Uint8Array> {
@@ -339,7 +344,7 @@ export class PdfWriter {
       const page = reserve()
       const content = reserve()
       kids.push(page)
-      set(page, `<< /Type /Page /Parent ${pagesRoot} 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources ${resources} 0 R /Contents ${content} 0 R >>`)
+      set(page, `<< /Type /Page /Parent ${pagesRoot} 0 R /MediaBox [0 0 ${num(this.width)} ${num(this.height)}] /Resources ${resources} 0 R /Contents ${content} 0 R >>`)
       set(content, await stream('', latin1(ops.join('\n'))))
     }
     set(pagesRoot, `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(' ')}] /Count ${kids.length} >>`)
@@ -430,4 +435,3 @@ async function deflate(data: Uint8Array): Promise<Uint8Array | null> {
   }
 }
 
-export { PAGE_WIDTH, PAGE_HEIGHT }

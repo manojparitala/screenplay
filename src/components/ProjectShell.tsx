@@ -42,6 +42,7 @@ import { ReportsView } from '../views/ReportsView'
 import { ScriptView } from '../views/ScriptView'
 import { TimelineView } from '../views/TimelineView'
 import { TitlePageView } from '../views/TitlePageView'
+import { FileButton } from './FileButton'
 import { HelpDialog } from './HelpDialog'
 import { SettingsDialog } from './SettingsDialog'
 import { SnapshotsDialog } from './SnapshotsDialog'
@@ -70,7 +71,7 @@ export async function exportAs(kind: 'pdf' | 'fountain' | 'fdx' | 'json') {
   try {
     if (kind === 'pdf') {
       // Text in Indian scripts needs its fonts and the shaping engine, loaded only when used.
-      const scripts = pdfScripts(data.script, data.settings.includeTitlePage ? data.titlePage : undefined)
+      const scripts = pdfScripts(data.script, data.settings.includeTitlePage ? data.titlePage : undefined, data.settings)
       let shaper: Shaper | null = null
       let fontError = false
       if (scripts.size) {
@@ -224,7 +225,7 @@ export function ProjectShell() {
   const dialog = useApp((s) => s.dialog)
   const theme = useApp((s) => s.prefs.theme)
   const focusMode = useApp((s) => s.focusMode && s.view === 'script')
-  const { setView, setDialog, closeProject, setFindOpen, saveNow, setPrefs, notify } = useApp.getState()
+  const { setView, setDialog, closeProject, setFindOpen, saveToFile, setPrefs } = useApp.getState()
 
   useEffect(() => {
     document.title = `${projectTitle(project)} – Screenplay`
@@ -243,7 +244,7 @@ export function ProjectShell() {
         setTimeout(() => document.querySelector<HTMLInputElement>('.findbar input')?.select(), 0)
       } else if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault()
-        void saveNow().then(() => notify('Saved.'))
+        void saveToFile()
       } else if (mod && e.key.toLowerCase() === 'p') {
         e.preventDefault()
         setView('preview')
@@ -255,7 +256,7 @@ export function ProjectShell() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [setView, setFindOpen, saveNow, notify, setDialog])
+  }, [setView, setFindOpen, saveToFile, setDialog])
 
   const isDark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
 
@@ -284,6 +285,7 @@ export function ProjectShell() {
         </nav>
         <div className="topbar-actions">
           <SaveIndicator />
+          <FileButton />
           <button
             className="icon-btn"
             onClick={() => {

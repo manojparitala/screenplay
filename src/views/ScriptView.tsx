@@ -260,7 +260,13 @@ function Editor() {
   }, [c])
 
   const s = project.settings
-  const classes = ['paper', s.showSceneNumbers && 'show-scene-numbers', s.boldSceneHeadings && 'bold-scenes', s.sceneSpacing === 2 && 'double-scene-spacing']
+  const classes = [
+    'paper',
+    s.paper === 'a4' && 'paper-a4',
+    s.showSceneNumbers && 'show-scene-numbers',
+    s.boldSceneHeadings && 'bold-scenes',
+    s.sceneSpacing === 2 && 'double-scene-spacing',
+  ]
     .filter(Boolean)
     .join(' ')
 

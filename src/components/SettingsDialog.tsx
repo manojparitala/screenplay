@@ -1,6 +1,8 @@
+import { PAPER } from '../core/elements'
+import type { PaperSize } from '../core/types'
 import { useApp, type Theme } from '../store/app'
 import { useProject } from '../store/hooks'
-import { Modal } from './ui'
+import { LazyInput, Modal } from './ui'
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const project = useProject()
@@ -13,6 +15,27 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       <h3 className="section-title" style={{ margin: 0 }}>
         This screenplay
       </h3>
+      <label className="field">
+        <span>Paper</span>
+        <select className="select" value={s.paper} onChange={(e) => updateSettings({ paper: e.target.value as PaperSize })}>
+          {(Object.keys(PAPER) as PaperSize[]).map((k) => (
+            <option key={k} value={k}>
+              {PAPER[k].label}
+            </option>
+          ))}
+        </select>
+        <small>Lines wrap the same on both. A4 is taller, so each page holds 59 lines instead of 55.</small>
+      </label>
+      <label className="field">
+        <span>Header</span>
+        <LazyInput className="input" value={s.header} onCommit={(header) => updateSettings({ header })} placeholder="For example: TITLE – Blue draft – 12/05/26" />
+        <small>Printed at the top left of every page after the first, beside the page number.</small>
+      </label>
+      <label className="field">
+        <span>Footer</span>
+        <LazyInput className="input" value={s.footer} onCommit={(footer) => updateSettings({ footer })} placeholder="For example: © 2026 Your Name. Confidential." />
+        <small>Printed at the bottom of every script page.</small>
+      </label>
       <label className="check">
         <input type="checkbox" checked={s.autoContd} onChange={(e) => updateSettings({ autoContd: e.target.checked })} />
         <span>

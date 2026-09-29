@@ -1,6 +1,6 @@
 import { Download, Printer } from 'lucide-react'
 import { useDeferredValue, useMemo, useState } from 'react'
-import { drawScript } from '../core/pdf'
+import { drawScript, pageSize } from '../core/pdf'
 import { exportAs } from '../components/ProjectShell'
 import { canPrint } from '../components/save'
 import { recordSheets, Sheet } from '../components/Sheets'
@@ -16,13 +16,15 @@ export function PreviewView() {
   // Text in Indian scripts is measured with its font, so lay out again once a font has loaded.
   const fontsVersion = useScriptFontsVersion()
   const sheets = useMemo(
-    () => recordSheets((s) => drawScript(s, elements, { settings: project.settings, titlePage: project.titlePage })),
+    () => recordSheets((s) => drawScript(s, elements, { settings: project.settings, titlePage: project.titlePage }), pageSize(project.settings)),
     [elements, project.settings, project.titlePage, fontsVersion],
   )
   const hasTitle = sheets.length > 0 && project.settings.includeTitlePage && !!(project.titlePage.title.trim() || project.titlePage.author.trim())
 
   return (
     <div className="view-scroll print-root">
+      {/* Print on the script's paper. */}
+      <style>{`@media print { @page { size: ${project.settings.paper === 'a4' ? 'A4' : 'letter'}; margin: 0 } }`}</style>
       <div className="preview-toolbar no-print">
         <span className="muted" style={{ fontSize: 13 }}>
           {sheets.length - (hasTitle ? 1 : 0)} page{sheets.length - (hasTitle ? 1 : 0) === 1 ? '' : 's'}

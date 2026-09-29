@@ -1,4 +1,4 @@
-import type { ElementType, EnterAfterDialogue } from './types'
+import type { ElementType, EnterAfterDialogue, PaperSize } from './types'
 
 export interface ElementInfo {
   label: string
@@ -138,7 +138,7 @@ export const TRANSITIONS = [
 
 export const CHARACTER_EXTENSIONS = ['V.O.', 'O.S.', 'O.C.', "CONT'D", 'PRE-LAP', 'ON PHONE', 'INTO PHONE']
 
-/** Physical page geometry (US Letter, industry-standard margins). */
+/** Physical page geometry (US Letter, industry-standard margins; see PAPER for A4). */
 export const PAGE = {
   /** Page size and margins in inches. */
   widthIn: 8.5,
@@ -150,4 +150,26 @@ export const PAGE = {
   /** Lines per inch for 12pt Courier with single spacing. */
   lpi: 6,
   linesPerPage: 55,
+}
+
+export interface PaperInfo {
+  label: string
+  widthIn: number
+  heightIn: number
+  linesPerPage: number
+}
+
+/**
+ * Paper sizes. The text sits in the same place on both: 1.5in from the left
+ * edge, 1in from the top and 6in wide, so a script wraps the same way on
+ * either. A4 is narrower and taller: the right margin shrinks to 0.77in and
+ * the page holds 59 lines instead of 55, with the same bottom margin.
+ */
+export const PAPER: Record<PaperSize, PaperInfo> = {
+  letter: { label: 'US Letter (8.5 × 11 in)', widthIn: 8.5, heightIn: 11, linesPerPage: 55 },
+  a4: { label: 'A4 (210 × 297 mm)', widthIn: 210 / 25.4, heightIn: 297 / 25.4, linesPerPage: 59 },
+}
+
+export function paperOf(settings: { paper?: PaperSize }): PaperInfo {
+  return PAPER[settings.paper === 'a4' ? 'a4' : 'letter']
 }

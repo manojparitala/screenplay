@@ -1,4 +1,5 @@
 import { ELEMENT_ORDER, ELEMENTS } from '../core/elements'
+import { fileAccessSupported } from '../store/files'
 import { Modal } from './ui'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
@@ -16,7 +17,7 @@ const SHORTCUTS: [string, string][] = [
   [`${mod}+B / I / U`, 'Bold, italic, underline.'],
   [`${mod}+Z / ${mod}+Shift+Z`, 'Undo / redo — works across all views.'],
   [`${mod}+F`, 'Find and replace.'],
-  [`${mod}+S`, 'Save now (the app also saves automatically).'],
+  [`${mod}+S`, 'Save now (the app also saves automatically). Where the browser allows it, the first time also asks for a file on your computer to keep the script in.'],
   [`${mod}+P`, 'Print preview.'],
   ['F1', 'This help.'],
 ]
@@ -62,7 +63,11 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
       <div>
         <h3 className="section-title">Where is my work saved?</h3>
         <p className="muted" style={{ margin: 0 }}>
-          In this browser on this device (IndexedDB). Nothing is sent to a server. Export a Fountain, Final Draft or backup file regularly, and use Snapshots to keep earlier drafts.
+          In this browser on this device (IndexedDB). Nothing is sent to a server.{' '}
+          {fileAccessSupported()
+            ? 'Choose “Save to file” at the top to keep the script in a file on your computer as well: every change is written to it, and “Open file…” in the library opens it again, on this computer or another. '
+            : 'Export a Fountain, Final Draft or backup file regularly. '}
+          Use Snapshots to keep earlier drafts.
         </p>
       </div>
     </Modal>

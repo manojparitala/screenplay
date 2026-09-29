@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseFountain } from './fountain'
-import { drawScript, exportPdf, pdfUnsupportedCharacters, type PdfSurface } from './pdf'
+import { drawScript, exportPdf, pageSize, pdfUnsupportedCharacters, type PdfSurface } from './pdf'
 import { SAMPLE_FOUNTAIN } from './sample'
 import { DEFAULT_SETTINGS, emptyTitlePage } from './types'
 
@@ -93,5 +93,62 @@ describe('pdf layout', () => {
     const head = new TextDecoder().decode(new Uint8Array(await blob.arrayBuffer()).slice(0, 5))
     expect(head).toBe('%PDF-')
     expect(missing).toEqual([])
+  })
+})
+
+describe('paper and page furniture', () => {
+  const { elements, titlePage } = parseFountain(SAMPLE_FOUNTAIN)
+  const tp = { ...emptyTitlePage(), ...titlePage }
+  const long = parseFountain(Array.from({ length: 200 }, (_, i) => `INT. ROOM ${i} - DAY\n\nSomething happens here.\n`).join('\n')).elements
+
+  it('fits 59 lines on A4 and 55 on US Letter, with the text in the same place', () => {
+    const letter = recorder()
+    const a4 = recorder()
+    const settings = { ...DEFAULT_SETTINGS, includeTitlePage: false }
+    drawScript(letter.surface, long, { settings })
+    drawScript(a4.surface, long, { settings: { ...settings, paper: 'a4' } })
+    expect(a4.pages()).toBeLessThan(letter.pages())
+    expect(pageSize({ paper: 'a4' })).toEqual({ width: expect.closeTo(595.28, 1), height: expect.closeTo(841.89, 1) })
+    // Headings start at the same left margin and the page number ends at the same right edge.
+    const heading = (r: ReturnType<typeof recorder>) => r.calls.find((c) => c.text === 'INT. ROOM 0 - DAY')!
+    expect(heading(a4).x).toBe(heading(letter).x)
+    const pageNumber = (r: ReturnType<typeof recorder>) => r.calls.find((c) => c.text === '2.')!
+    expect(pageNumber(a4).x).toBe(pageNumber(letter).x)
+    // The deepest line on an A4 page sits lower than any line on a Letter page.
+    const lowest = (r: ReturnType<typeof recorder>) => Math.max(...r.calls.filter((c) => c.page === 1).map((c) => c.y))
+    expect(lowest(a4) - lowest(letter)).toBeCloseTo(4 * 12, 0)
+  })
+
+  it('centres the title page on the paper', () => {
+    const r = recorder()
+    drawScript(r.surface, elements, { settings: { ...DEFAULT_SETTINGS, paper: 'a4' }, titlePage: tp })
+    const title = r.calls.find((c) => c.text === 'THE LAST LIGHTHOUSE')!
+    expect(title.x + ('THE LAST LIGHTHOUSE'.length * 7.2) / 2).toBeCloseTo(pageSize({ paper: 'a4' }).width / 2)
+  })
+
+  it('prints the header after the first page and the footer on every script page', () => {
+    const r = recorder()
+    drawScript(r.surface, long, { settings: { ...DEFAULT_SETTINGS, header: 'LONG DAY – Blue draft', footer: '© 2026 A. Writer' }, titlePage: tp })
+    const pages = r.pages()
+    const on = (text: string) => [...new Set(r.calls.filter((c) => c.text === text).map((c) => c.page))]
+    // Page 1 is the title page, page 2 the first script page.
+    expect(on('LONG DAY - Blue draft')).toEqual(Array.from({ length: pages - 2 }, (_, i) => i + 3))
+    expect(on('© 2026 A. Writer')).toEqual(Array.from({ length: pages - 1 }, (_, i) => i + 2))
+    const footer = r.calls.find((c) => c.text === '© 2026 A. Writer')!
+    expect(footer.y).toBeGreaterThan(740)
+  })
+
+  it('shortens a header that would run into the page number', () => {
+    const r = recorder()
+    drawScript(r.surface, long, { settings: { ...DEFAULT_SETTINGS, includeTitlePage: false, header: 'X'.repeat(80) } })
+    const header = r.calls.find((c) => c.page === 2 && c.text.startsWith('XXX'))!
+    expect(header.text).toBe('X'.repeat(47) + '...')
+  })
+
+  it('writes the page size into the PDF', async () => {
+    const { blob } = await exportPdf(elements, { settings: { ...DEFAULT_SETTINGS, paper: 'a4' }, titlePage: tp })
+    const pdf = new TextDecoder('latin1').decode(new Uint8Array(await blob.arrayBuffer()))
+    expect(pdf).toContain('/MediaBox [0 0 595.276 841.89]')
+    expect(pdf).not.toContain('/MediaBox [0 0 612 792]')
   })
 })

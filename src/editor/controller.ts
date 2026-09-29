@@ -6,7 +6,7 @@ import { Fragment, Slice, type Node as PMNode } from 'prosemirror-model'
 import { EditorState, TextSelection, type Command, type Transaction } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
 import { analyze, renameCharacterText, renameCue, type ScriptAnalysis } from '../core/analysis'
-import { ELEMENT_ORDER, ELEMENTS } from '../core/elements'
+import { ELEMENT_ORDER, ELEMENTS, paperOf } from '../core/elements'
 import { parseFountain, toFountain } from '../core/fountain'
 import { uid } from '../core/id'
 import { paginate, type Pagination } from '../core/paginate'
@@ -157,7 +157,7 @@ export class ScriptController {
 
   private computeLayout(): Pagination {
     const s = this.opts.getSettings()
-    return paginate(this.getElements(), { sceneSpacing: s.sceneSpacing, autoContd: s.autoContd })
+    return paginate(this.getElements(), { sceneSpacing: s.sceneSpacing, autoContd: s.autoContd, linesPerPage: paperOf(s).linesPerPage })
   }
 
   private scheduleLayout() {

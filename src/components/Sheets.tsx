@@ -9,6 +9,9 @@ interface SheetRule {
 }
 
 export interface SheetData {
+  /** Page size in points. */
+  width: number
+  height: number
   spans: TextSpan[]
   rules: SheetRule[]
 }
@@ -17,14 +20,15 @@ export interface SheetData {
  * Records the calls the PDF exporter makes, so the on-screen preview is drawn
  * from exactly the same layout as the downloaded PDF.
  */
-export function recordSheets(draw: (surface: PdfSurface) => void): SheetData[] {
-  const sheets: SheetData[] = [{ spans: [], rules: [] }]
+export function recordSheets(draw: (surface: PdfSurface) => void, size = { width: 612, height: 792 }): SheetData[] {
+  const sheet = (): SheetData => ({ ...size, spans: [], rules: [] })
+  const sheets: SheetData[] = [sheet()]
   draw({
     text: (span) => {
       if (span.text) sheets[sheets.length - 1].spans.push(span)
     },
     line: (x1, y1, x2, y2) => sheets[sheets.length - 1].rules.push({ x1, y1, x2, y2 }),
-    addPage: () => sheets.push({ spans: [], rules: [] }),
+    addPage: () => sheets.push(sheet()),
   })
   return sheets
 }
@@ -39,7 +43,14 @@ const isItalic = (s: Style) => s === 'italic' || s === 'bolditalic'
  */
 export function Sheet({ data, label }: { data: SheetData; label: string }) {
   return (
-    <svg className="sheet" viewBox="0 0 612 792" role="img" aria-label={label} xmlSpace="preserve">
+    <svg
+      className="sheet"
+      viewBox={`0 0 ${data.width} ${data.height}`}
+      style={{ width: `calc(var(--sheet-scale, 1) * ${data.width}pt)`, height: `calc(var(--sheet-scale, 1) * ${data.height}pt)` }}
+      role="img"
+      aria-label={label}
+      xmlSpace="preserve"
+    >
       {data.spans.map((t, i) =>
         t.script ? (
           <text

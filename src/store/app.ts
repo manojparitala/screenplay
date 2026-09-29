@@ -1,15 +1,22 @@
 import { create } from 'zustand'
 import { uid } from '../core/id'
-import { createProject, projectFromFile, projectFromParsed, projectTitle } from '../core/project'
+import { createProject, parseProjectFile, projectFromFile, projectFromParsed, projectTitle } from '../core/project'
 import { sampleProject } from '../core/sample'
 import type { Project, ScriptSettings, Snapshot } from '../core/types'
 import { ScriptController } from '../editor/controller'
 import * as db from './db'
+import * as files from './files'
 
 export type ViewId = 'script' | 'cards' | 'beats' | 'characters' | 'timeline' | 'relationships' | 'locations' | 'reports' | 'title' | 'notes' | 'preview'
 export type DialogId = 'settings' | 'snapshots' | 'help' | null
 export type Theme = 'system' | 'light' | 'dark'
 export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error'
+
+/** The file on the writer's computer the open script is saved to, if any. */
+export interface FileState {
+  name: string
+  status: 'saved' | 'saving' | 'needs-permission' | 'error'
+}
 
 export interface Prefs {
   theme: Theme
@@ -67,6 +74,8 @@ interface AppState {
   findOpen: boolean
   focusMode: boolean
   saveState: SaveState
+  /** The file on the writer's computer the open script is also saved to. */
+  file: FileState | null
   sessionStartWords: number
   prefs: Prefs
   toasts: Toast[]
@@ -91,6 +100,17 @@ interface AppState {
   saveNow(): Promise<void>
   currentProjectData(): Project | null
 
+  /** Ctrl/⌘+S: save now, asking where the first time if files can be saved here. */
+  saveToFile(): Promise<void>
+  /** Choose a file on the computer to keep the open script in. */
+  saveFileAs(): Promise<void>
+  /** Let the browser write to the linked file again (it forgets between visits); call from a click. */
+  reconnectFile(): Promise<void>
+  /** Stop saving the open script to its file. */
+  unlinkFile(): Promise<void>
+  /** Open a script file from the computer and keep saving to it. */
+  openFile(): Promise<void>
+
   createSnapshot(name: string): Promise<void>
   restoreSnapshot(snap: Snapshot): Promise<void>
 
@@ -113,6 +133,9 @@ async function seedSampleOnFirstRun(existing: number) {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let unsubscribeDoc: (() => void) | null = null
+/** The open script's file, and the queue of writes to it (one at a time, in order). */
+let link: files.FileLink | null = null
+let fileWrites: Promise<void> = Promise.resolve()
 
 export const useApp = create<AppState>((set, get) => {
   const scheduleSave = () => {
@@ -129,6 +152,41 @@ export const useApp = create<AppState>((set, get) => {
     return { controller, words: controller.getAnalysis().words }
   }
 
+  /** Write the script to its linked file, after any write already under way. */
+  const writeLinkedFile = (project: Project): Promise<void> => {
+    const l = link
+    if (!l || l.projectId !== project.id) return fileWrites
+    fileWrites = fileWrites.then(async () => {
+      if (link !== l) return
+      const name = l.handle.name
+      if (!(await files.canWrite(l.handle))) {
+        set({ file: { name, status: 'needs-permission' } })
+        return
+      }
+      set({ file: { name, status: 'saving' } })
+      try {
+        await files.writeProjectFile(l.handle, project)
+        if (link === l) set({ file: { name, status: 'saved' } })
+      } catch (e) {
+        if (link !== l) return
+        const wasOk = get().file?.status !== 'error'
+        set({ file: { name, status: 'error' } })
+        if (wasOk) get().notify(`Couldn’t save to “${name}”: ${(e as Error).message}. Your work is still saved in this browser.`, 'error')
+      }
+    })
+    return fileWrites
+  }
+
+  /** Point the open script at a file (or none) and show whether it can be written. */
+  const useLink = async (next: files.FileLink | null) => {
+    link = next
+    if (!next) {
+      set({ file: null })
+      return
+    }
+    set({ file: { name: next.handle.name, status: (await files.canWrite(next.handle)) ? 'saved' : 'needs-permission' } })
+  }
+
   return {
     ready: false,
     projects: [],
@@ -139,6 +197,7 @@ export const useApp = create<AppState>((set, get) => {
     findOpen: false,
     focusMode: false,
     saveState: 'saved',
+    file: null,
     sessionStartWords: 0,
     prefs: loadPrefs(),
     toasts: [],
@@ -205,16 +264,23 @@ export const useApp = create<AppState>((set, get) => {
       } catch {
         /* sandboxed */
       }
+      await useLink(await files.getLink(project.id).catch(() => null))
+      const f = get().file
+      if (f?.status === 'needs-permission') {
+        get().notify(`To keep saving to “${f.name}”, press Ctrl/⌘+S or click the file name at the top, then allow it.`)
+      }
     },
 
     async closeProject() {
       const { controller, saveState } = get()
       if (!controller) return
       if (saveState !== 'saved') await get().saveNow()
+      await fileWrites
       if (saveTimer) clearTimeout(saveTimer)
       unsubscribeDoc?.()
       unsubscribeDoc = null
       controller.destroy()
+      await useLink(null)
       set({ project: null, controller: null, findOpen: false, dialog: null, focusMode: false })
       try {
         history.replaceState(null, '', '#/')
@@ -226,6 +292,8 @@ export const useApp = create<AppState>((set, get) => {
 
     async deleteProject(id) {
       await db.deleteProject(id)
+      // The file on the computer is left alone; only the link to it goes.
+      await files.removeLink(id).catch(() => {})
       await get().refreshLibrary()
     },
 
@@ -277,7 +345,7 @@ export const useApp = create<AppState>((set, get) => {
       const settings = { ...p.settings, ...s }
       set({ project: { ...p, settings } })
       scheduleSave()
-      if ('sceneSpacing' in s || 'autoContd' in s) get().controller?.relayout()
+      if ('sceneSpacing' in s || 'autoContd' in s || 'paper' in s) get().controller?.relayout()
     },
 
     currentProjectData() {
@@ -305,9 +373,108 @@ export const useApp = create<AppState>((set, get) => {
         if (get().saveState === 'saving') set({ saveState: 'saved' })
         const current = get().project
         if (current && current.id === updated.id) set({ project: { ...current, updatedAt: updated.updatedAt, stats: updated.stats } })
+        await writeLinkedFile(updated)
       } catch (e) {
         set({ saveState: 'error' })
         get().notify(`Saving failed: ${(e as Error).message}`, 'error')
+      }
+    },
+
+    async saveToFile() {
+      if (!files.fileAccessSupported()) {
+        await get().saveNow()
+        get().notify('Saved.')
+        return
+      }
+      if (!link) return get().saveFileAs()
+      if (get().file?.status === 'needs-permission') return get().reconnectFile()
+      await get().saveNow()
+      if (get().file?.status === 'saved') get().notify(`Saved to “${link.handle.name}”.`)
+    },
+
+    async saveFileAs() {
+      const data = get().currentProjectData()
+      if (!data) return
+      let handle: files.FileHandle | null
+      try {
+        handle = await files.pickSaveFile(files.fileNameFor(projectTitle(data)))
+      } catch (e) {
+        get().notify(`Couldn’t save the file: ${(e as Error).message}`, 'error')
+        return
+      }
+      if (!handle) return
+      await files.setLink(data.id, handle)
+      await useLink({ projectId: data.id, handle })
+      await get().saveNow()
+      if (get().file?.status === 'saved') get().notify(`Saving to “${handle.name}” on your computer. Every change is saved there as you write.`)
+    },
+
+    async reconnectFile() {
+      if (!link) return
+      if (await files.askToWrite(link.handle)) {
+        set({ file: { name: link.handle.name, status: 'saved' } })
+        await get().saveNow()
+      } else {
+        get().notify(`Without permission, changes stay in this browser and aren’t saved to “${link.handle.name}”.`, 'error')
+      }
+    },
+
+    async unlinkFile() {
+      const { project } = get()
+      if (!project || !link) return
+      const name = link.handle.name
+      await fileWrites
+      await files.removeLink(project.id)
+      await useLink(null)
+      get().notify(`No longer saving to “${name}”. The script stays in this browser.`)
+    },
+
+    async openFile() {
+      let handle: files.FileHandle | null
+      try {
+        handle = await files.pickOpenFile()
+      } catch (e) {
+        get().notify(`Couldn’t open the file: ${(e as Error).message}`, 'error')
+        return
+      }
+      if (!handle) return
+      const file = await handle.getFile()
+      let p: Project
+      try {
+        p = parseProjectFile(await file.text())
+      } catch {
+        // Not one of ours (Fountain, Final Draft, PDF…): bring it in as a new script, leaving the file alone.
+        await get().importFile(file)
+        return
+      }
+      // Ask to write back straight away; if the browser won't ask now, the writer is asked on the next save.
+      await files.askToWrite(handle)
+      // Save the open script first, in case it is the one in the file.
+      await get().closeProject()
+      const when = new Date().toLocaleString()
+      const snapshot = (of: Pick<Project, 'script' | 'titlePage' | 'stats'>, projectId: string, name: string) =>
+        db.putSnapshot({ id: uid(), projectId, name, createdAt: Date.now(), pages: of.stats?.pages ?? 0, script: of.script, titlePage: of.titlePage })
+      const existing = await db.getProject(p.id)
+      let newerHere = false
+      if (existing && existing.updatedAt > p.updatedAt) {
+        // This browser has newer work: keep it, keep the file's version as a snapshot, and update the file.
+        newerHere = true
+        if (JSON.stringify(existing.script) !== JSON.stringify(p.script)) await snapshot(p, p.id, `From “${file.name}” (${when})`)
+      } else {
+        if (existing && JSON.stringify(existing.script) !== JSON.stringify(p.script)) await snapshot(existing, p.id, `Before opening “${file.name}” (${when})`)
+        await db.putProject(p)
+      }
+      await files.setLink(p.id, handle)
+      await get().openProject(p.id)
+      const saving = get().file?.status === 'saved'
+      if (newerHere) {
+        if (saving) await get().saveNow()
+        get().notify(
+          `This browser had newer changes than “${file.name}”, so they were kept${get().file?.status === 'saved' ? ' and saved to the file' : ''}. ` +
+            'The file’s version is in Snapshots.',
+        )
+      } else if (saving) {
+        get().notify(`Opened “${file.name}”. Changes are saved to it as you write.`)
       }
     },
 

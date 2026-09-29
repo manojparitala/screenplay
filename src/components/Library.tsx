@@ -7,6 +7,7 @@ import {
   EllipsisVertical,
   FileDown,
   FilePlus,
+  FolderOpen,
   LayoutGrid,
   MapPin,
   Moon,
@@ -21,6 +22,7 @@ import { useRef, useState, type DragEvent } from 'react'
 import { projectTitle, safeFileName, serializeProject } from '../core/project'
 import type { Project } from '../core/types'
 import { useApp } from '../store/app'
+import { fileAccessSupported } from '../store/files'
 import { saveFile } from './save'
 import { Menu, Modal, timeAgo } from './ui'
 
@@ -39,7 +41,8 @@ const FEATURES = [
 
 export function Library() {
   const projects = useApp((s) => s.projects)
-  const { newProject, openProject, importFile, duplicateProject, deleteProject, setPrefs } = useApp.getState()
+  const { newProject, openProject, importFile, openFile, duplicateProject, deleteProject, setPrefs } = useApp.getState()
+  const files = fileAccessSupported()
   const theme = useApp((s) => s.prefs.theme)
   const fileRef = useRef<HTMLInputElement>(null)
   const [confirm, setConfirm] = useState<Project | null>(null)
@@ -87,6 +90,11 @@ export function Library() {
               <p>Write, outline and format scripts to industry standard. Drop a PDF, Fountain, Final Draft or backup file here to import it.</p>
             </div>
             <div className="library-actions">
+              {files && (
+                <button className="btn" onClick={() => void openFile()} title="Open a script you saved to a file on this computer, and keep saving to it">
+                  <FolderOpen size={16} /> Open file…
+                </button>
+              )}
               <button className="btn" onClick={() => fileRef.current?.click()}>
                 <Upload size={16} /> Import
               </button>
@@ -188,7 +196,10 @@ export function Library() {
             ))}
           </div>
           <p className="faint" style={{ marginTop: 24, fontSize: 12.5 }}>
-            <MapPin size={12} style={{ verticalAlign: -1 }} /> Scripts are stored in this browser only. Use “Download backup” or Export to keep a copy elsewhere.
+            <MapPin size={12} style={{ verticalAlign: -1 }} />{' '}
+            {files
+              ? 'Scripts are stored in this browser. To keep one in a file on your computer as well, open it and choose “Save to file”.'
+              : 'Scripts are stored in this browser only. Use “Download backup” or Export to keep a copy elsewhere.'}
           </p>
         </div>
       </main>
