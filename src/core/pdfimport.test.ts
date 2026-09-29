@@ -38,6 +38,23 @@ describe('PDF import', () => {
     expect(simplify(result.elements)).toEqual(simplify(printable).map(([type, text]) => [type === 'centered' ? 'centered' : type, text]))
   }, 30000)
 
+  it('reads PDFs in browsers that can’t loop over streams (Safari)', async () => {
+    const { elements } = parseFountain('INT. HOUSE - DAY\n\nRain on the roof.\n\nANNA\nStay.\n')
+    const { blob } = await exportPdf(elements, { settings: { ...DEFAULT_SETTINGS, includeTitlePage: false } })
+    // Take away `for await` over streams, as Safari lacks it.
+    const proto = ReadableStream.prototype as unknown as Record<PropertyKey, unknown>
+    const saved = { iterator: Object.getOwnPropertyDescriptor(proto, Symbol.asyncIterator), values: Object.getOwnPropertyDescriptor(proto, 'values') }
+    delete proto[Symbol.asyncIterator]
+    delete proto.values
+    try {
+      const pages = await readPdfPages(new Uint8Array(await blob.arrayBuffer()), pdfjs as unknown as PdfJsLike)
+      expect(simplify(parsePdfPages(pages).elements)).toEqual(simplify(elements))
+    } finally {
+      if (saved.iterator) Object.defineProperty(proto, Symbol.asyncIterator, saved.iterator)
+      if (saved.values) Object.defineProperty(proto, 'values', saved.values)
+    }
+  }, 30000)
+
   it('uses printed scene numbers to find headings that lack INT./EXT.', async () => {
     const { elements } = parseFountain(
       Array.from({ length: 30 }, (_, i) => `.MONTAGE ${i + 1} - THE CITY WAKES\n\nTRAFFIC SURGES ACROSS THE BRIDGE.\n\nPeople hurry past.\n`).join('\n'),

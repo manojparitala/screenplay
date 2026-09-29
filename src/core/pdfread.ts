@@ -16,9 +16,23 @@ interface PdfDocLike {
 interface PdfPageLike {
   getViewport(o: { scale: number }): { width: number; height: number }
   getOperatorList(): Promise<unknown>
-  getTextContent(): Promise<{ items: unknown[] }>
+  streamTextContent(): ReadableStream<{ items: unknown[] }>
   commonObjs: { get(id: string): unknown }
   cleanup(): void
+}
+
+/**
+ * All the text items of a page. pdf.js's own getTextContent() loops over a
+ * stream with `for await`, which Safari can't do, so read the stream here.
+ */
+async function textItems(page: PdfPageLike): Promise<unknown[]> {
+  const reader = page.streamTextContent().getReader()
+  const items: unknown[] = []
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) return items
+    for (const item of value.items) items.push(item)
+  }
 }
 
 interface TextItemLike {
@@ -31,8 +45,7 @@ interface TextItemLike {
 
 /** Extract positioned text from every page of a PDF with pdf.js. */
 export async function readPdfPages(data: Uint8Array, pdfjs: PdfJsLike, onProgress?: (page: number, total: number) => void): Promise<PdfPage[]> {
-  // Only the text is read, never drawn: loading the PDF's fonts into the page would be wasted
-  // work, and Safari's engine can wait on some of them forever.
+  // Only the text is read, never drawn, so the PDF's fonts needn't be loaded into the page.
   const task = pdfjs.getDocument({ data, verbosity: 0, isEvalSupported: false, disableFontFace: true })
   const doc = await task.promise
   const pages: PdfPage[] = []
@@ -42,9 +55,8 @@ export async function readPdfPages(data: Uint8Array, pdfjs: PdfJsLike, onProgres
       const viewport = page.getViewport({ scale: 1 })
       // Loading the operator list makes the real font names (e.g. "Courier-Bold") available.
       await page.getOperatorList()
-      const content = await page.getTextContent()
       const items: PdfItem[] = []
-      for (const raw of content.items) {
+      for (const raw of await textItems(page)) {
         const it = raw as TextItemLike
         if (typeof it.str !== 'string' || !it.transform) continue
         let font = it.fontName
