@@ -575,6 +575,18 @@ kbd {
   color: inherit;
 }
 
+.toast .toast-action {
+  flex: none;
+  margin-top: 1px;
+  background: transparent;
+  border-color: currentColor;
+  color: inherit;
+}
+
+.toast .toast-action:hover {
+  background: rgba(127, 127, 127, 0.25);
+}
+
 /* ------------------------------------------------------------------ */
 /* Library                                                             */
 /* ------------------------------------------------------------------ */

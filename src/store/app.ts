@@ -60,10 +60,17 @@ function savePrefs(p: Prefs) {
   }
 }
 
+export interface ToastAction {
+  label: string
+  run: () => void
+}
+
 export interface Toast {
   id: string
   message: string
   kind: 'info' | 'error'
+  /** A button beside the message; such toasts stay until used or dismissed. */
+  action?: ToastAction
 }
 
 interface AppState {
@@ -118,7 +125,7 @@ interface AppState {
   createSnapshot(name: string): Promise<void>
   restoreSnapshot(snap: Snapshot): Promise<void>
 
-  notify(message: string, kind?: Toast['kind']): string
+  notify(message: string, kind?: Toast['kind'], action?: ToastAction): string
   dismissToast(id: string): void
 }
 
@@ -615,10 +622,10 @@ export const useApp = create<AppState>((set, get) => {
       get().notify(`Restored ${what}. You can undo this from the Edit menu or with Ctrl/⌘+Z.`)
     },
 
-    notify(message, kind = 'info') {
+    notify(message, kind = 'info', action) {
       const id = uid()
-      set({ toasts: [...get().toasts, { id, message, kind }] })
-      setTimeout(() => get().dismissToast(id), kind === 'error' ? 9000 : 4000)
+      set({ toasts: [...get().toasts, { id, message, kind, action }] })
+      if (!action) setTimeout(() => get().dismissToast(id), kind === 'error' ? 9000 : 4000)
       return id
     },
     dismissToast(id) {

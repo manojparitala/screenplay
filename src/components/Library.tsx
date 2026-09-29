@@ -12,6 +12,7 @@ import {
   FolderOpen,
   LayoutGrid,
   MapPin,
+  MonitorDown,
   Moon,
   Route,
   ShieldCheck,
@@ -21,16 +22,33 @@ import {
   Upload,
   Users,
 } from 'lucide-react'
-import { useRef, useState, type DragEvent } from 'react'
+import { useEffect, useReducer, useRef, useState, type DragEvent } from 'react'
 import { projectTitle, safeFileName, serializeProject } from '../core/project'
 import type { Project } from '../core/types'
 import { useApp } from '../store/app'
 import { fileAccessSupported } from '../store/files'
+import { canInstall, install, onInstallChange } from '../store/offline'
 import { backupAll, backupReminderDue, lastBackupAt, snoozeBackupReminder } from './backup'
 import { saveFile } from './save'
 import { Menu, Modal, timeAgo } from './ui'
 
 const ACCEPT = '.fountain,.spmd,.txt,.fdx,.pdf,.json,.md,.zip'
+
+/** Offered where the browser can install the app (Chrome and Edge), until it is installed. */
+function InstallButton() {
+  const [, refresh] = useReducer((n: number) => n + 1, 0)
+  useEffect(() => onInstallChange(refresh), [])
+  if (!canInstall()) return null
+  return (
+    <button
+      className="btn small ghost"
+      onClick={() => void install()}
+      title="Install Screenplay on this device: it opens in its own window, from the dock, taskbar or home screen, and works offline"
+    >
+      <MonitorDown size={15} /> Install app
+    </button>
+  )
+}
 
 const FEATURES = [
   { icon: Clapperboard, title: 'Industry-standard formatting', text: 'Scene headings, action, character, parenthetical, dialogue and transitions laid out in Courier on real page margins. Enter and Tab move between elements for you.' },
@@ -80,6 +98,7 @@ export function Library() {
         </div>
         <div className="tabs" />
         <div className="topbar-actions">
+          <InstallButton />
           <button className="icon-btn" onClick={() => setPrefs({ theme: isDark ? 'light' : 'dark' })} aria-label="Toggle dark mode" title="Toggle dark mode">
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
