@@ -1,8 +1,10 @@
 import { create } from 'zustand'
+import { AUTO_SNAPSHOT_EVERY, autoSnapshotsToDrop, hasWords, isBackupScript, sameContent } from '../core/backup'
 import { uid } from '../core/id'
-import { createProject, parseProjectFile, projectFromFile, projectFromParsed, projectTitle } from '../core/project'
+import { createProject, parseProjectBackup, projectFromFile, projectFromParsed, projectTitle } from '../core/project'
 import { sampleProject } from '../core/sample'
 import type { Project, ScriptSettings, Snapshot } from '../core/types'
+import { unzipFiles } from '../core/zip'
 import { ScriptController } from '../editor/controller'
 import * as db from './db'
 import * as files from './files'
@@ -110,6 +112,8 @@ interface AppState {
   unlinkFile(): Promise<void>
   /** Open a script file from the computer and keep saving to it. */
   openFile(): Promise<void>
+  /** Bring back the scripts in a backup (a zip of the library, or one script's file). */
+  restoreBackup(file: File): Promise<void>
 
   createSnapshot(name: string): Promise<void>
   restoreSnapshot(snap: Snapshot): Promise<void>
@@ -136,6 +140,78 @@ let unsubscribeDoc: (() => void) | null = null
 /** The open script's file, and the queue of writes to it (one at a time, in order). */
 let link: files.FileLink | null = null
 let fileWrites: Promise<void> = Promise.resolve()
+/** When each script last had an automatic snapshot. */
+const lastAutoSnapshot = new Map<string, number>()
+
+/**
+ * Before a save replaces a script, keep what it replaces as an automatic
+ * snapshot, at most every ten minutes, and thin out the older ones. Never
+ * gets in the way of saving.
+ */
+async function autoSnapshot(next: Project) {
+  try {
+    let last = lastAutoSnapshot.get(next.id)
+    if (last === undefined) {
+      last = Math.max(0, ...(await db.listSnapshots(next.id)).filter((s) => s.auto).map((s) => s.createdAt))
+      lastAutoSnapshot.set(next.id, last)
+    }
+    const now = Date.now()
+    if (now - last < AUTO_SNAPSHOT_EVERY) return
+    const prev = await db.getProject(next.id)
+    if (!prev || !hasWords(prev.script) || sameContent(prev, next)) return
+    lastAutoSnapshot.set(next.id, now)
+    await db.putSnapshot({
+      id: uid(),
+      projectId: prev.id,
+      name: 'Automatic backup',
+      auto: true,
+      createdAt: prev.updatedAt,
+      pages: prev.stats?.pages ?? 0,
+      script: prev.script,
+      titlePage: prev.titlePage,
+    })
+    const autos = (await db.listSnapshots(next.id)).filter((s) => s.auto)
+    for (const id of autoSnapshotsToDrop(autos, now)) await db.deleteSnapshot(id)
+  } catch (e) {
+    console.warn('Automatic snapshot failed', e)
+  }
+}
+
+/** Whether a file is a zip archive, by its first bytes, whatever it is called. */
+async function isZip(file: Blob): Promise<boolean> {
+  const head = new Uint8Array(await file.slice(0, 4).arrayBuffer())
+  return head[0] === 0x50 && head[1] === 0x4b && head[2] === 3 && head[3] === 4
+}
+
+/** What happened to a script brought in from a file: new here, replacing an older version, older than the one here, or the same. */
+type TakeIn = 'added' | 'replaced' | 'kept' | 'same'
+
+/**
+ * Bring a script from a file into the library without losing either version:
+ * the newer one becomes the script and the older one a snapshot. Ties go to
+ * the file. Snapshots carried in the file (backups have them) come along.
+ */
+async function takeIn(p: Project, snapshots: Snapshot[], source: string, action: 'opening' | 'restoring'): Promise<TakeIn> {
+  const keep = (of: Project, name: string) =>
+    db.putSnapshot({ id: uid(), projectId: p.id, name, createdAt: of.updatedAt, pages: of.stats?.pages ?? 0, script: of.script, titlePage: of.titlePage })
+  const existing = await db.getProject(p.id)
+  let result: TakeIn
+  if (!existing) {
+    await db.putProject(p)
+    result = 'added'
+  } else if (existing.updatedAt === p.updatedAt && sameContent(existing, p)) {
+    result = 'same'
+  } else if (existing.updatedAt > p.updatedAt) {
+    if (!sameContent(existing, p)) await keep(p, `From “${source}”`)
+    result = 'kept'
+  } else {
+    if (!sameContent(existing, p)) await keep(existing, `Before ${action} “${source}”`)
+    await db.putProject(p)
+    result = 'replaced'
+  }
+  for (const s of snapshots) await db.putSnapshot({ ...s, projectId: p.id })
+  return result
+}
 
 export const useApp = create<AppState>((set, get) => {
   const scheduleSave = () => {
@@ -229,6 +305,7 @@ export const useApp = create<AppState>((set, get) => {
     },
 
     async importFile(file) {
+      if (await isZip(file)) return get().restoreBackup(file)
       try {
         let p: Project
         if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
@@ -368,6 +445,7 @@ export const useApp = create<AppState>((set, get) => {
       set({ saveState: 'saving' })
       try {
         const updated = { ...data, updatedAt: Date.now() }
+        await autoSnapshot(updated)
         await db.putProject(updated)
         // Only mark saved if nothing changed while we were writing.
         if (get().saveState === 'saving') set({ saveState: 'saved' })
@@ -439,31 +517,21 @@ export const useApp = create<AppState>((set, get) => {
       }
       if (!handle) return
       const file = await handle.getFile()
-      let p: Project
+      let opened: { project: Project; snapshots: Snapshot[] }
       try {
-        p = parseProjectFile(await file.text())
+        opened = parseProjectBackup(await file.text())
       } catch {
         // Not one of ours (Fountain, Final Draft, PDF…): bring it in as a new script, leaving the file alone.
         await get().importFile(file)
         return
       }
+      const p = opened.project
       // Ask to write back straight away; if the browser won't ask now, the writer is asked on the next save.
       await files.askToWrite(handle)
       // Save the open script first, in case it is the one in the file.
       await get().closeProject()
-      const when = new Date().toLocaleString()
-      const snapshot = (of: Pick<Project, 'script' | 'titlePage' | 'stats'>, projectId: string, name: string) =>
-        db.putSnapshot({ id: uid(), projectId, name, createdAt: Date.now(), pages: of.stats?.pages ?? 0, script: of.script, titlePage: of.titlePage })
-      const existing = await db.getProject(p.id)
-      let newerHere = false
-      if (existing && existing.updatedAt > p.updatedAt) {
-        // This browser has newer work: keep it, keep the file's version as a snapshot, and update the file.
-        newerHere = true
-        if (JSON.stringify(existing.script) !== JSON.stringify(p.script)) await snapshot(p, p.id, `From “${file.name}” (${when})`)
-      } else {
-        if (existing && JSON.stringify(existing.script) !== JSON.stringify(p.script)) await snapshot(existing, p.id, `Before opening “${file.name}” (${when})`)
-        await db.putProject(p)
-      }
+      // If this browser has newer work, it is kept (and written to the file below), and the file's version kept as a snapshot.
+      const newerHere = (await takeIn(p, opened.snapshots, file.name, 'opening')) === 'kept'
       await files.setLink(p.id, handle)
       await get().openProject(p.id)
       const saving = get().file?.status === 'saved'
@@ -476,6 +544,50 @@ export const useApp = create<AppState>((set, get) => {
       } else if (saving) {
         get().notify(`Opened “${file.name}”. Changes are saved to it as you write.`)
       }
+    },
+
+    async restoreBackup(file) {
+      const found: { project: Project; snapshots: Snapshot[] }[] = []
+      let unreadable = 0
+      try {
+        if (await isZip(file)) {
+          const importable = (name: string) => /\.(fdx|fountain|spmd)$/i.test(name) && !/(^|\/)(__MACOSX\/|\._)/.test(name)
+          const entries = await unzipFiles(new Uint8Array(await file.arrayBuffer()), (name) => isBackupScript(name) || importable(name))
+          for (const entry of entries.filter((e) => isBackupScript(e.name))) {
+            try {
+              found.push(parseProjectBackup(new TextDecoder().decode(entry.data)))
+            } catch {
+              unreadable++
+            }
+          }
+          // A single script zipped up, as the claude.ai viewer hands over Final Draft files: import it.
+          if (!found.length && !unreadable && entries.length === 1) {
+            const [only] = entries
+            return get().importFile(new File([only.data as Uint8Array<ArrayBuffer>], only.name.split('/').pop()!))
+          }
+          if (!found.length) throw new Error('There are no scripts in this zip file. Pick a backup made with “Back up all scripts”.')
+        } else {
+          found.push(parseProjectBackup(await file.text()))
+        }
+      } catch (e) {
+        get().notify(`Restore failed: ${(e as Error).message}`, 'error')
+        return
+      }
+      await get().closeProject()
+      const results: TakeIn[] = []
+      for (const { project, snapshots } of found) results.push(await takeIn(project, snapshots, file.name, 'restoring'))
+      await get().refreshLibrary()
+      const count = (r: TakeIn) => results.filter((x) => x === r).length
+      const scripts = (n: number) => `${n} script${n === 1 ? '' : 's'}`
+      const restored = count('added') + count('replaced')
+      const parts = [restored ? `Restored ${scripts(restored)} from “${file.name}”.` : `Nothing to restore from “${file.name}”.`]
+      if (count('same')) parts.push(`${scripts(count('same'))} already up to date.`)
+      if (count('kept')) {
+        const one = count('kept') === 1
+        parts.push(`${scripts(count('kept'))} had newer changes in this browser, which were kept; the backup’s ${one ? 'version is' : 'versions are'} in Snapshots.`)
+      }
+      if (unreadable) parts.push(`${unreadable} file${unreadable === 1 ? '' : 's'} in the backup couldn’t be read.`)
+      get().notify(parts.join(' '), unreadable ? 'error' : 'info')
     },
 
     async createSnapshot(name) {
@@ -496,10 +608,11 @@ export const useApp = create<AppState>((set, get) => {
     async restoreSnapshot(snap) {
       const { controller } = get()
       if (!controller) return
-      await get().createSnapshot(`Before restoring “${snap.name}”`)
+      const what = snap.auto ? `the automatic backup from ${new Date(snap.createdAt).toLocaleString()}` : `“${snap.name}”`
+      await get().createSnapshot(`Before restoring ${what}`)
       controller.replaceScript(snap.script)
       get().updateProject(() => ({ titlePage: snap.titlePage }))
-      get().notify(`Restored “${snap.name}”. You can undo this from the Edit menu or with Ctrl/⌘+Z.`)
+      get().notify(`Restored ${what}. You can undo this from the Edit menu or with Ctrl/⌘+Z.`)
     },
 
     notify(message, kind = 'info') {

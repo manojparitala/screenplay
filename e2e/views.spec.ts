@@ -94,7 +94,7 @@ test('imports a Final Draft file from the library', async ({ page }) => {
 <Paragraph Type="Character"><Text>CAPTAIN</Text></Paragraph>
 <Paragraph Type="Dialogue"><Text>Dive.</Text></Paragraph>
 </Content></FinalDraft>`
-  await page.locator('input[type=file]').setInputFiles({ name: 'Deep Water.fdx', mimeType: 'application/xml', buffer: Buffer.from(fdx) })
+  await page.getByLabel('File to import').setInputFiles({ name: 'Deep Water.fdx', mimeType: 'application/xml', buffer: Buffer.from(fdx) })
   await expect(page.locator('.project-title')).toHaveText('Deep Water')
   await expect(page.locator('.el-character')).toHaveText('CAPTAIN')
   await expect(page.locator('.el-dialogue')).toHaveText('Dive.')
@@ -184,7 +184,7 @@ test('imports a screenplay PDF, such as one exported from this app', async ({ pa
   const pdfPath = testInfo.outputPath('lighthouse.pdf')
   await (await download).saveAs(pdfPath)
   await page.getByRole('button', { name: 'Back to library' }).click()
-  await page.locator('input[type=file]').setInputFiles(pdfPath)
+  await page.getByLabel('File to import').setInputFiles(pdfPath)
   await expect(page.locator('.script-editor')).toBeVisible({ timeout: 20000 })
   await expect(page.locator('.project-title')).toHaveText('THE LAST LIGHTHOUSE')
   await expect(page.locator('.nav-scene')).toHaveCount(6)

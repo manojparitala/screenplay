@@ -12,6 +12,7 @@ import {
   type Project,
   type ScriptElement,
   type ScriptSettings,
+  type Snapshot,
   type TitlePage,
 } from './types'
 
@@ -61,8 +62,9 @@ export function projectTitle(p: Pick<Project, 'titlePage'>): string {
 
 const BACKUP_FORMAT = 'screenplay-project'
 
-export function serializeProject(p: Project): string {
-  return JSON.stringify({ format: BACKUP_FORMAT, version: 1, project: p }, null, 2)
+/** A script as a file, optionally with its snapshots (as in a backup of the library). */
+export function serializeProject(p: Project, snapshots?: Snapshot[]): string {
+  return JSON.stringify({ format: BACKUP_FORMAT, version: 1, project: p, ...(snapshots?.length ? { snapshots } : {}) }, null, 2)
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -100,13 +102,34 @@ function sanitizeElements(raw: unknown): ScriptElement[] {
   return out
 }
 
+function sanitizeTitlePage(raw: unknown): TitlePage {
+  const tp = isObject(raw) ? raw : {}
+  const titlePage = { ...emptyTitlePage() }
+  for (const k of Object.keys(titlePage) as (keyof TitlePage)[]) if (typeof tp[k] === 'string') titlePage[k] = tp[k] as string
+  return titlePage
+}
+
+/** Validate a snapshot from a backup file; null if it can't be used. */
+export function sanitizeSnapshot(raw: unknown, projectId: string): Snapshot | null {
+  if (!isObject(raw) || typeof raw.id !== 'string' || typeof raw.createdAt !== 'number' || !Array.isArray(raw.script)) return null
+  const snap: Snapshot = {
+    id: raw.id,
+    projectId,
+    name: str(raw.name) || 'Snapshot',
+    createdAt: raw.createdAt,
+    pages: typeof raw.pages === 'number' ? raw.pages : 0,
+    script: sanitizeElements(raw.script),
+    titlePage: sanitizeTitlePage(raw.titlePage),
+  }
+  if (raw.auto === true) snap.auto = true
+  return snap
+}
+
 /** Validate a project loaded from a backup file or storage, filling any missing fields. */
 export function sanitizeProject(raw: unknown, keepId = true): Project {
   if (!isObject(raw)) throw new Error('Not a screenplay project.')
   const base = createProject()
-  const tp = isObject(raw.titlePage) ? raw.titlePage : {}
-  const titlePage = { ...emptyTitlePage() }
-  for (const k of Object.keys(titlePage) as (keyof TitlePage)[]) if (typeof tp[k] === 'string') titlePage[k] = tp[k] as string
+  const titlePage = sanitizeTitlePage(raw.titlePage)
   const script = sanitizeElements(raw.script)
   return {
     ...base,
@@ -144,6 +167,11 @@ export function detectFormat(fileName: string, text: string): ImportFormat {
  * throws rather than risk overwriting someone's other files.
  */
 export function parseProjectFile(text: string): Project {
+  return parseProjectBackup(text).project
+}
+
+/** The same, with any snapshots the file carries (backups of the library include them). */
+export function parseProjectBackup(text: string): { project: Project; snapshots: Snapshot[] } {
   let data: unknown = null
   try {
     data = JSON.parse(text)
@@ -153,7 +181,9 @@ export function parseProjectFile(text: string): Project {
   if (!isObject(data) || data.format !== BACKUP_FORMAT || !isObject(data.project) || typeof data.project.id !== 'string') {
     throw new Error('This file isn’t a screenplay saved by this app.')
   }
-  return sanitizeProject(data.project, true)
+  const project = sanitizeProject(data.project, true)
+  const snapshots = Array.isArray(data.snapshots) ? data.snapshots.map((s) => sanitizeSnapshot(s, project.id)).filter((s) => s !== null) : []
+  return { project, snapshots }
 }
 
 /** Build a new project from an imported file. */

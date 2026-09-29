@@ -15,7 +15,7 @@ async function exportFrom(app: Page | FrameLocator, label: string) {
 test('download names keep the title as the writer typed it', async ({ page }) => {
   await page.goto('/')
   const fountain = 'Title: Vāli: “The Return”\n\nINT. TEMPLE - DAY\n\nBells ring.\n'
-  await page.locator('input[type=file]').setInputFiles({ name: 'vali.fountain', mimeType: 'text/plain', buffer: Buffer.from(fountain) })
+  await page.getByLabel('File to import').setInputFiles({ name: 'vali.fountain', mimeType: 'text/plain', buffer: Buffer.from(fountain) })
   await expect(page.locator('.project-title')).toHaveText('Vāli: “The Return”')
   for (const [label, name] of [
     ['Fountain', 'Vāli - “The Return”.fountain'],

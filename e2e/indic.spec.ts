@@ -32,7 +32,7 @@ MAYA
 
 async function importScript(page: Page) {
   await page.goto('/')
-  await page.locator('input[type=file]').setInputFiles({ name: 'vali.fountain', mimeType: 'text/plain', buffer: Buffer.from(SCRIPT) })
+  await page.getByLabel('File to import').setInputFiles({ name: 'vali.fountain', mimeType: 'text/plain', buffer: Buffer.from(SCRIPT) })
   await expect(page.locator('.project-title')).toHaveText('வாலி')
   // The bundled fonts load as soon as the editor shows text in their scripts.
   await page.waitForFunction(() =>
@@ -89,7 +89,7 @@ test('exports a PDF with shaped Indian scripts that imports back', async ({ page
   await expect(page.locator('.toast.error')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Back to library' }).click()
-  await page.locator('input[type=file]').setInputFiles(path)
+  await page.getByLabel('File to import').setInputFiles(path)
   await expect(page.locator('.script-editor')).toBeVisible({ timeout: 20000 })
   await expect(page.locator('.project-title')).toHaveText('வாலி')
   await expect(page.locator('.nav-scene .heading')).toHaveText(['INT. வீடு - இரவு', 'INT. ఇల్లు - రాత్రి', 'EXT. ಮನೆ - ಹಗಲು', 'EXT. വീട് - പകൽ', 'INT. कमरा - रात'])

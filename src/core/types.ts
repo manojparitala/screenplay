@@ -133,10 +133,13 @@ export interface Snapshot {
   id: string
   projectId: string
   name: string
+  /** When the script was as saved here. */
   createdAt: number
   pages: number
   script: ScriptElement[]
   titlePage: TitlePage
+  /** Taken by the app as the writer works, and thinned out over time; the writer's own are kept. */
+  auto?: boolean
 }
 
 export const DEFAULT_SETTINGS: ScriptSettings = {

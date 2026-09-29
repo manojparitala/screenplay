@@ -1,4 +1,6 @@
 import {
+  Archive,
+  ArchiveRestore,
   BookOpen,
   ChartColumn,
   Clapperboard,
@@ -12,6 +14,7 @@ import {
   MapPin,
   Moon,
   Route,
+  ShieldCheck,
   Sparkles,
   Sun,
   Trash,
@@ -23,10 +26,11 @@ import { projectTitle, safeFileName, serializeProject } from '../core/project'
 import type { Project } from '../core/types'
 import { useApp } from '../store/app'
 import { fileAccessSupported } from '../store/files'
+import { backupAll, backupReminderDue, lastBackupAt, snoozeBackupReminder } from './backup'
 import { saveFile } from './save'
 import { Menu, Modal, timeAgo } from './ui'
 
-const ACCEPT = '.fountain,.spmd,.txt,.fdx,.pdf,.json,.md'
+const ACCEPT = '.fountain,.spmd,.txt,.fdx,.pdf,.json,.md,.zip'
 
 const FEATURES = [
   { icon: Clapperboard, title: 'Industry-standard formatting', text: 'Scene headings, action, character, parenthetical, dialogue and transitions laid out in Courier on real page margins. Enter and Tab move between elements for you.' },
@@ -35,18 +39,26 @@ const FEATURES = [
   { icon: Route, title: 'Beat sheets', text: 'Save the Cat!, Three-Act, Hero’s Journey and Story Circle templates. Each beat shows the page it should land on.' },
   { icon: Users, title: 'Characters & locations', text: 'Character bios, wants, needs and arcs. Chart each character’s journey through scenes and places, and rename anyone everywhere in one step.' },
   { icon: ChartColumn, title: 'Reports', text: 'Page count, runtime, scene lengths in eighths, dialogue share per character, INT/EXT and day/night breakdowns.' },
-  { icon: FileDown, title: 'Import & export', text: 'Fountain, Final Draft (.fdx) and PDF with a title page. Snapshots keep earlier drafts safe.' },
+  { icon: FileDown, title: 'Import & export', text: 'Fountain, Final Draft (.fdx) and PDF with a title page. Automatic snapshots and one-click backups keep earlier drafts safe.' },
   { icon: BookOpen, title: 'Private & offline', text: 'Your scripts are saved in this browser, on this device. Nothing is uploaded to a server.' },
 ]
 
 export function Library() {
   const projects = useApp((s) => s.projects)
-  const { newProject, openProject, importFile, openFile, duplicateProject, deleteProject, setPrefs } = useApp.getState()
+  const { newProject, openProject, importFile, openFile, restoreBackup, duplicateProject, deleteProject, setPrefs } = useApp.getState()
   const files = fileAccessSupported()
   const theme = useApp((s) => s.prefs.theme)
   const fileRef = useRef<HTMLInputElement>(null)
+  const restoreRef = useRef<HTMLInputElement>(null)
   const [confirm, setConfirm] = useState<Project | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [lastBackup, setLastBackup] = useState(lastBackupAt)
+  const [snoozed, setSnoozed] = useState(false)
+  const remind = !snoozed && projects.length > 0 && backupReminderDue(Math.max(...projects.map((p) => p.updatedAt)))
+
+  const backUp = async () => {
+    if (await backupAll()) setLastBackup(lastBackupAt())
+  }
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
@@ -109,6 +121,7 @@ export function Library() {
                 type="file"
                 accept={ACCEPT}
                 hidden
+                aria-label="File to import"
                 onChange={(e) => {
                   const f = e.target.files?.[0]
                   if (f) void importFile(f)
@@ -117,6 +130,28 @@ export function Library() {
               />
             </div>
           </div>
+
+          {remind && (
+            <div className="backup-reminder" role="status">
+              <ShieldCheck size={18} />
+              <p>
+                {lastBackup ? `Your last backup was ${timeAgo(lastBackup)}.` : 'You haven’t backed up your scripts yet.'} They are kept in this browser, so a backup keeps
+                them safe if its data is ever cleared.
+              </p>
+              <button className="btn primary small" onClick={() => void backUp()}>
+                Back up now
+              </button>
+              <button
+                className="btn ghost small"
+                onClick={() => {
+                  snoozeBackupReminder()
+                  setSnoozed(true)
+                }}
+              >
+                Remind me later
+              </button>
+            </div>
+          )}
 
           <div className="library-grid">
             {projects.map((p) => (
@@ -185,6 +220,38 @@ export function Library() {
             </button>
           </div>
 
+          <section className="backup-panel panel" aria-labelledby="backups-title">
+            <div>
+              <h2 id="backups-title">
+                <ShieldCheck size={16} color="var(--accent)" /> Backups
+              </h2>
+              <p>
+                One file with every script and its snapshots, to keep somewhere safe or move to another computer.{' '}
+                {lastBackup ? `Last backup ${timeAgo(lastBackup)}.` : 'No backup yet.'} Snapshots are also kept automatically as you write.
+              </p>
+            </div>
+            <div className="library-actions">
+              <button className="btn" onClick={() => void backUp()} disabled={!projects.length}>
+                <Archive size={16} /> Back up all scripts
+              </button>
+              <button className="btn" onClick={() => restoreRef.current?.click()}>
+                <ArchiveRestore size={16} /> Restore from backup…
+              </button>
+              <input
+                ref={restoreRef}
+                type="file"
+                accept=".zip,.json"
+                hidden
+                aria-label="Backup file to restore"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) void restoreBackup(f)
+                  e.target.value = ''
+                }}
+              />
+            </div>
+          </section>
+
           <div className="feature-list">
             {FEATURES.map((f) => (
               <div className="feature" key={f.title}>
@@ -199,7 +266,7 @@ export function Library() {
             <MapPin size={12} style={{ verticalAlign: -1 }} />{' '}
             {files
               ? 'Scripts are stored in this browser. To keep one in a file on your computer as well, open it and choose “Save to file”.'
-              : 'Scripts are stored in this browser only. Use “Download backup” or Export to keep a copy elsewhere.'}
+              : 'Scripts are stored in this browser only. Use “Back up all scripts” regularly to keep a copy elsewhere.'}
           </p>
         </div>
       </main>

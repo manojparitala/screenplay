@@ -66,8 +66,9 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
           In this browser on this device (IndexedDB). Nothing is sent to a server.{' '}
           {fileAccessSupported()
             ? 'Choose “Save to file” at the top to keep the script in a file on your computer as well: every change is written to it, and “Open file…” in the library opens it again, on this computer or another. '
-            : 'Export a Fountain, Final Draft or backup file regularly. '}
-          Use Snapshots to keep earlier drafts.
+            : ''}
+          As you write, the app keeps automatic snapshots of earlier versions (see Snapshots), and “Back up all scripts” in the library saves every script to one
+          file to keep somewhere safe or move to another computer.
         </p>
       </div>
     </Modal>
